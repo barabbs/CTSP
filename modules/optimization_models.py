@@ -170,9 +170,7 @@ class GAPModel(pyo.AbstractModel):
         inst = self.create_instance(data={None: {"n": {None: n}, "x": adj}})
         sol = PYOMO_SOLVER.solve(inst, tee=verbose)
         val, raw = pyo.value(inst.objective), sol.json_repn()['Solver'][0]
-        return {'value': 1 / val,
-                'solution': {'status': raw['Status'], 'termination_condition': raw['Termination condition']},
-                'time': {'proc': raw['Time'], 'wall': float(raw['Wall time'])}}
+        return 1 / val, raw
 
 
 SEP_MODEL = SEPModel()

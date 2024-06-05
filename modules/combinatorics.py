@@ -28,15 +28,13 @@ def cycles(nodes, parts, minimum=None):
                 yield ((top, *chunk), *tail)
 
 
-def graph_codings_generator_2(N):
-    nodes = tuple(range(N))
-    partitions = tuple(partition(N, maximum=N - 2, minimum=2))
+def graph_codings_generator(n, k=2):
+    if not k == 2:
+        raise NotImplemented
+    nodes = tuple(range(n))
+    partitions = tuple(partition(n, maximum=n - 2, minimum=2))
     for i_p, p_1 in enumerate(partitions):
-        s_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
-        c_1 = Cover(s_1)
-        logging.trace_a(f"\t{c_1}")
+        c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
         for p_2 in partitions[i_p:]:
-            for s_2 in cycles(set(nodes), p_2):
-                c_2=Cover(s_2)
-                logging.trace_b(f"\t\t{c_2}")
+            for c_2 in cycles(set(nodes), p_2):
                 yield Coding((c_1, c_2))

@@ -1,7 +1,7 @@
 from pyomo.core.expr import identify_variables
 import networkx as nx
 import pynauty
-import json, os
+import json, os, time
 from modules import var
 
 GREEN = '\033[92m'
@@ -46,11 +46,11 @@ def get_nauty_graph(n, k, graph):
     return pynauty.Graph(n, directed=True, adjacency_dict=adj, vertex_coloring=colors)
 
 
-def get_adjacency_matrix(n, k, graph):
+def get_adjacency_matrix(n, k, graph, weights):
     adj = dict(sum((tuple(((i, j), 0) for j in range(n) if j != i) for i in range(n)), start=tuple()))
     for u, neigh in graph.adjacency():
         for v, edges in neigh.items():
-            adj[(u, v)] = len(edges) / k
+            adj[(u, v)] = len(edges) / k  # TODO: Implement weights
     return adj
 
 
@@ -76,3 +76,8 @@ def save_graph_file(graph, data):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
             json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
+
+def timing(function, *args, **kwargs):
+    start = time.process_time_ns()
+    result = function(*args, **kwargs)
+    return time.process_time_ns() - start, result

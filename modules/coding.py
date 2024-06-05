@@ -47,8 +47,8 @@ class Coding(object):
 
 
 class Cover(object):
-    def __init__(self, cycles=None):
-        self.cycles, self.parts = tuple(), tuple()
+    def __init__(self, cycles=None, weight=1):
+        self.cycles, self.parts, self.weight = tuple(), tuple(), weight
         for c in cycles or tuple():
             self.add_cycle(c)
         # assert all(x >= y for x, y in zip(self.parts, self.parts[1:]))
@@ -85,7 +85,7 @@ class Cover(object):
                 yield tail_tr
 
     def apply_translation(self, translation):
-        new_cover = Cover()
+        new_cover = Cover(weight=self.weight)
         for cycle in self.cycles:
             new_cover.add_cycle(tuple(translation[i] for i in cycle))
         new_cover.sort()
