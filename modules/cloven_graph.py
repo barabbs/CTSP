@@ -32,9 +32,9 @@ def calc_certificate(nauty_graph):
     return utl.timing(pynauty.certificate, nauty_graph)
 
 
-def calc_gap(n, adj_matrix):
+def calc_gap(n, adj_matrix, opt_verbose):
     def calc_gap_wrap(adj_matrix):
-        return opt_mdl.GAP_MODEL.solve_instance(n, adj_matrix)
+        return opt_mdl.GAP_MODEL.solve_instance(n, adj_matrix, opt_verbose)
 
     return utl.timing(calc_gap_wrap, adj_matrix)
 
@@ -145,12 +145,12 @@ def get_ClovenGraph(N, K, W):
         # @timing('calc_canonic_code')  # TODO: Not implemented!
         # def calc_canonic_code(self):
         #     code = self._coding
-        #     # print(f"\t\tBEGIN {code}")
+        #     # print(f"        BEGIN {code}")
         #     for j, comp in enumerate(self._coding.code_permutations()):
-        #         # print(f"\t\t\tCOMP {comp}")
+        #         # print(f"            COMP {comp}")
         #         for i, trans in enumerate(comp[0].get_translations()):
         #             new_code = self._coding.apply_translation(trans)
-        #             # print(f"\t\t\t\t{new_code}\t\t{trans}")
+        #             # print(f"                {new_code}        {trans}")
         #             code = min(code, new_code)
         #     return code
 
@@ -244,7 +244,7 @@ def get_ClovenGraph(N, K, W):
         #             new_code = self.original_code.apply_translation(trans)
         #             self.code, self.graph = new_code, _get_graph_from_code(new_code)
         #             code = min(code, new_code)
-        #             # print(f"\t{new_code} - {code}")
+        #             # print(f"    {new_code} - {code}")
         #             plt.subplot(rows, cols, j * cols + i + 1)
         #             pos = dict((trans[k], i) for k, i in orig_pos.items())
         #             self.draw(pos)

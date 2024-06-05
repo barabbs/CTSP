@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 
-def initialize_database(graph_class, n, k, w, delete=True, verbose=True):
+def initialize_database(graph_class, n, k, w, delete, verbose):
     path = var.DATABASE_FILEPATH.format(k=k, n=n, weights="-".join(str(i) for i in w))
     if delete and os.path.exists(path):
         os.remove(path)
@@ -40,56 +40,53 @@ def _get_next_batch(graphs_gen):
         return
 
 
-def _get_batch_run(session, function, graphs, res_handler, *iterables):
-    with ProcessPoolExecutor() as executor:
-        for graph, result in zip(graphs, executor.map(function, *iterables)):  # TODO: select right chunksize!
-            res_handler(graph, *result, session=session)
-            logging.debug(f"\t{graph}")
-
-
-def _get_batch_run(executor, function, graphs, attrs, ex_attrs):
+def _get_batch_run(executor, function, graphs, attrs, ex_attrs, params, chunksize):
     return executor.map(function,  # TODO: select right chunksize!
                         *tuple((getattr(g, attr) for g in graphs) for attr in (attrs or tuple())),
                         *tuple((getattr(g, attr)() for g in graphs) for attr in (ex_attrs or tuple())),
-                        chunksize=var.CHUNKSIZE)
+                        *tuple((p for g in graphs) for p in params),
+                        chunksize=chunksize)
+
 
 def _handle_batch_result(session, batch_run, graphs, res_handler):
     for graph, result in zip(graphs, batch_run):
         res_handler(graph, *result, session=session)
-    logging.stage(f"\t\t\tCommitting...")
+        logging.result(f"                {graph}")
+    logging.stage(f"            Committing...")
     session.commit()
 
 
-def _parallel_run(session, graph_class, statement, function, res_handler, attrs=None, ex_attrs=None):
+def _parallel_run(session, graph_class, statement, function, res_handler, process_opt,
+                  attrs=None, ex_attrs=None, params=None):
     tot = session.query(graph_class).where(*statement).count()
     if tot == 0:
-        logging.trace(f"\tNothing to do :)")
+        logging.trace(f"    Nothing to do :)")
         return
-    batch_size = var.CPU_COUNT * var.CHUNKSIZE * var.N_CHUNKS
+    batch_size = process_opt['max_workers'] * process_opt['chunksize'] * process_opt['n_chunks']
     i, n_batches = 1, ceil(tot / batch_size)
-    logging.trace(f"\tTotal {tot:>8}\t({n_batches} batches of {batch_size} graphs)")
+    logging.trace(f"    Total {tot:>8}    ({n_batches} batches of {batch_size} graphs)")
     graphs_gen = session.scalars(
         select(graph_class).where(*statement).execution_options(yield_per=batch_size)).partitions()
-    with ProcessPoolExecutor(max_workers=var.CPU_COUNT) as executor:
-        logging.stage(f"\t\t => PrLoad {i:>5}/{n_batches}")
+    with ProcessPoolExecutor(max_workers=process_opt['max_workers']) as executor:
+        logging.stage(f"         => PrLoad {i:>5}/{n_batches}")
         next_batch = _get_next_batch(graphs_gen)
         batch_run, graphs = None, None
         while next_batch is not None:
-            logging.trace(f"\t\tBatch {i:>5}/{n_batches}")
+            logging.trace(f"        Batch {i:>5}/{n_batches}")
             last_graphs, last_batch_run = graphs, batch_run
             graphs = next_batch
-            logging.stage(f"\t\t => Launch {i:>5}/{n_batches}")
-            batch_run = _get_batch_run(executor, function, graphs, attrs, ex_attrs)
-            logging.stage(f"\t\t => PrLoad {i+1:>5}/{n_batches}")
+            logging.stage(f"         => Launch {i:>5}/{n_batches}")
+            batch_run = _get_batch_run(executor, function, graphs, attrs, ex_attrs, params, process_opt['chunksize'])
+            logging.stage(f"         => PrLoad {i + 1:>5}/{n_batches}")
             next_batch = _get_next_batch(graphs_gen)
             if next_batch is None:
-                logging.stage(f"\t\t\tNothing more to load!")
+                logging.stage(f"            Nothing more to load!")
             if last_batch_run is not None:
-                logging.stage(f"\t\t => Handle {i-1:>5}/{n_batches}")
+                logging.stage(f"         => Handle {i - 1:>5}/{n_batches}")
                 _handle_batch_result(session, last_batch_run, last_graphs, res_handler)
             i += 1
-        logging.trace(f"\t\tFinishing up...")
-        logging.stage(f"\t\t => Handle {i-1:>5}/{n_batches}")
+        logging.trace(f"        Finishing up...")
+        logging.stage(f"         => Handle {i - 1:>5}/{n_batches}")
         _handle_batch_result(session, batch_run, graphs, res_handler)
 
 
@@ -114,7 +111,7 @@ def _gap_handler(graph, timing, gap_raw, session, **kwargs):
     graph.set_timing('calc_gap', timing)
 
 
-def _check_properties(graph_class, engine, n, *args, **kwargs):
+def _check_properties(graph_class, engine, n, process_opt, *args, **kwargs):
     with Session(engine) as session:
         logging.info("Starting SUBT & EXTR check")
         _parallel_run(session=session,
@@ -123,7 +120,8 @@ def _check_properties(graph_class, engine, n, *args, **kwargs):
                       function=check_subt_extr,
                       res_handler=_subt_extr_handler,
                       attrs=("n",),
-                      ex_attrs=("get_adjacency_matrix",))
+                      ex_attrs=("get_adjacency_matrix",),
+                      process_opt=process_opt)
         logging.info("Finished SUBT & EXTR check")
         logging.info("Starting CANON check")
         _parallel_run(session=session,
@@ -131,11 +129,12 @@ def _check_properties(graph_class, engine, n, *args, **kwargs):
                       statement=(graph_class.prop_canon.is_(None),),
                       function=check_canon,
                       res_handler=_canon_handler,
-                      attrs=("_coding",))  # TODO: Do not access private attribute!
+                      attrs=("_coding",),
+                      process_opt=process_opt)  # TODO: Do not access private attribute!
         logging.info("Finished CANON check")
 
 
-def _calc_certificates(graph_class, engine, *args, **kwargs):
+def _calc_certificates(graph_class, engine, process_opt, *args, **kwargs):
     with Session(engine) as session:
         logging.info("Starting CERTIFICATE calc")
         _parallel_run(session=session,
@@ -143,27 +142,32 @@ def _calc_certificates(graph_class, engine, *args, **kwargs):
                       statement=(graph_class.certificate.is_(None),),
                       function=calc_certificate,
                       res_handler=_certificate_handler,
-                      ex_attrs=("get_nauty_graph",))
+                      ex_attrs=("get_nauty_graph",),
+                      process_opt=process_opt)
         logging.info("Finished CERTIFICATE calc")
 
 
-def _calc_gaps(graph_class, engine, n, *args, **kwargs):
+def _calc_gaps(graph_class, engine, n, process_opt, opt_verbose, *args, **kwargs):
     with Session(engine) as session:
         logging.info("Starting GAP calc")
         _parallel_run(session=session,
                       graph_class=graph_class,
-                      statement=(graph_class.prop_subt, graph_class.prop_extr, graph_class.prop_canon, graph_class.gap.is_(None)),
+                      statement=(
+                          graph_class.prop_subt, graph_class.prop_extr, graph_class.prop_canon,
+                          graph_class.gap.is_(None)),
                       function=calc_gap,
                       res_handler=_gap_handler,
                       attrs=("n",),
-                      ex_attrs=("get_adjacency_matrix",))
+                      ex_attrs=("get_adjacency_matrix",),
+                      params=(opt_verbose,),
+                      process_opt=process_opt, )
         logging.info("Finished GAP calc")
 
 
-def run(n, k, weights, delete, sql_verbose, process_opt):
+def run(n, k, weights, delete, sql_verbose, process_opt, opt_verbose):
     weights = weights or (1,) * k
     graph_class = get_ClovenGraph(n, k, weights)
     engine = initialize_database(graph_class, n, k, weights, delete, sql_verbose)
     _check_properties(graph_class, engine, n, process_opt)
     _calc_certificates(graph_class, engine, n, process_opt)
-    _calc_gaps(graph_class, engine, n, process_opt)
+    _calc_gaps(graph_class, engine, n, process_opt, opt_verbose)
