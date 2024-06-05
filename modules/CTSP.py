@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 
-def initialize_database(graph_class, n, k, w, delete, verbose):
+def initialize_database(graph_class, n, k, w, delete=False, verbose=False):
     path = var.DATABASE_FILEPATH.format(k=k, n=n, weights="-".join(str(i) for i in w))
     if delete and os.path.exists(path):
         os.remove(path)
@@ -44,7 +44,7 @@ def _get_batch_run(executor, function, graphs, attrs, ex_attrs, params, chunksiz
     return executor.map(function,  # TODO: select right chunksize!
                         *tuple((getattr(g, attr) for g in graphs) for attr in (attrs or tuple())),
                         *tuple((getattr(g, attr)() for g in graphs) for attr in (ex_attrs or tuple())),
-                        *tuple((p for g in graphs) for p in params),
+                        *tuple((p for g in graphs) for p in (params or tuple())),
                         chunksize=chunksize)
 
 
@@ -56,17 +56,23 @@ def _handle_batch_result(session, batch_run, graphs, res_handler):
     session.commit()
 
 
-def _parallel_run(session, graph_class, statement, function, res_handler, process_opt,
+def _parallel_run(session, graph_class, function, res_handler, process_opt, where_smnt, group_by_col=None,
                   attrs=None, ex_attrs=None, params=None):
-    tot = session.query(graph_class).where(*statement).count()
+    q_smnt = session.query(graph_class).where(*where_smnt)
+    q_smnt = q_smnt if group_by_col is None else q_smnt.group_by(group_by_col)
+    tot = q_smnt.count()
     if tot == 0:
         logging.trace(f"    Nothing to do :)")
         return
+
     batch_size = process_opt['max_workers'] * process_opt['chunksize'] * process_opt['n_chunks']
     i, n_batches = 1, ceil(tot / batch_size)
     logging.trace(f"    Total {tot:>8}    ({n_batches} batches of {batch_size} graphs)")
-    graphs_gen = session.scalars(
-        select(graph_class).where(*statement).execution_options(yield_per=batch_size)).partitions()
+
+    statement = select(graph_class).where(*where_smnt)
+    statement = statement if group_by_col is None else statement.group_by(group_by_col)
+    graphs_gen = session.scalars(statement.execution_options(yield_per=batch_size)).partitions()
+
     with ProcessPoolExecutor(max_workers=process_opt['max_workers']) as executor:
         logging.stage(f"         => PrLoad {i:>5}/{n_batches}")
         next_batch = _get_next_batch(graphs_gen)
@@ -116,7 +122,7 @@ def _check_properties(graph_class, engine, n, process_opt, *args, **kwargs):
         logging.info("Starting SUBT & EXTR check")
         _parallel_run(session=session,
                       graph_class=graph_class,
-                      statement=(graph_class.prop_subt.is_(None),),
+                      where_smnt=(graph_class.prop_subt.is_(None),),
                       function=check_subt_extr,
                       res_handler=_subt_extr_handler,
                       attrs=("n",),
@@ -126,7 +132,7 @@ def _check_properties(graph_class, engine, n, process_opt, *args, **kwargs):
         logging.info("Starting CANON check")
         _parallel_run(session=session,
                       graph_class=graph_class,
-                      statement=(graph_class.prop_canon.is_(None),),
+                      where_smnt=(graph_class.prop_canon.is_(None),),
                       function=check_canon,
                       res_handler=_canon_handler,
                       attrs=("_coding",),
@@ -139,7 +145,7 @@ def _calc_certificates(graph_class, engine, process_opt, *args, **kwargs):
         logging.info("Starting CERTIFICATE calc")
         _parallel_run(session=session,
                       graph_class=graph_class,
-                      statement=(graph_class.certificate.is_(None),),
+                      where_smnt=(graph_class.certificate.is_(None),),
                       function=calc_certificate,
                       res_handler=_certificate_handler,
                       ex_attrs=("get_nauty_graph",),
@@ -152,9 +158,10 @@ def _calc_gaps(graph_class, engine, n, process_opt, opt_verbose, *args, **kwargs
         logging.info("Starting GAP calc")
         _parallel_run(session=session,
                       graph_class=graph_class,
-                      statement=(
+                      where_smnt=(
                           graph_class.prop_subt, graph_class.prop_extr, graph_class.prop_canon,
                           graph_class.gap.is_(None)),
+                      group_by_col=graph_class.certificate,
                       function=calc_gap,
                       res_handler=_gap_handler,
                       attrs=("n",),
@@ -164,10 +171,10 @@ def _calc_gaps(graph_class, engine, n, process_opt, opt_verbose, *args, **kwargs
         logging.info("Finished GAP calc")
 
 
-def run(n, k, weights, delete, sql_verbose, process_opt, opt_verbose):
+def run(n, k, weights, delete, process_opt, sql_verbose, opt_verbose):
     weights = weights or (1,) * k
     graph_class = get_ClovenGraph(n, k, weights)
     engine = initialize_database(graph_class, n, k, weights, delete, sql_verbose)
-    _check_properties(graph_class, engine, n, process_opt)
-    _calc_certificates(graph_class, engine, n, process_opt)
-    _calc_gaps(graph_class, engine, n, process_opt, opt_verbose)
+    _check_properties(graph_class=graph_class, engine=engine, n=n, process_opt=process_opt)
+    _calc_certificates(graph_class=graph_class, engine=engine, n=n, process_opt=process_opt)
+    _calc_gaps(graph_class=graph_class, engine=engine, n=n, process_opt=process_opt, opt_verbose=opt_verbose)

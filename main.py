@@ -79,5 +79,5 @@ if __name__ == '__main__':
         if args.weights is not None:
             assert sum(args.weights) == k
         for n in args.n:
-            CTSP.run(k=k, n=n, weights=args.weights, delete=args.delete, sql_verbose=args.sql_verbose,
-                     process_opt=process_opt, opt_verbose=args.opt_verbose)
+            CTSP.run(k=k, n=n, weights=args.weights, delete=args.delete, process_opt=process_opt, sql_verbose=args.sql_verbose,
+                     opt_verbose=args.opt_verbose)
