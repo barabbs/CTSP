@@ -1,0 +1,8 @@
+numpy
+matplotlib
+pyomo
+sqlalchemy
+networkx
+pynauty
+more-itertools
+enlighten

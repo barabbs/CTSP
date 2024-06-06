@@ -218,10 +218,10 @@ def run(n, k, weights, delete, extensive, process_opt, sql_verbose, opt_verbose)
                 "est_calc_time_params": var.EST_CALC_TIME_PARAMS
             },
             "timings": dict()}
-    print("\n\n" + "-" * 64 +
+    print("\n\n" + "-" * 96 +
           f"\nn={n}, k={k}, w={weights}  |  strategy #{var.STRATEGY_NUM}  |  {'del ' if delete else ''}{'ext ' if extensive else ''}\n" +
-          f"process_opt: {process_opt}\n\n" +
-          "-" * 64 + "\n\n")
+          f"{process_opt}\n" +
+          "-" * 96 + "\n\n")
     info = utl.save_run_info_file(info, "start")
     metadata, models = get_ClovenGraph(n, k, weights)
     engine = initialize_database(metadata, models['cloven_graph'], n, k, weights, delete, sql_verbose)
