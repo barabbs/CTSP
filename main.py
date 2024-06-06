@@ -21,6 +21,7 @@ logging.addLevelName(logging.RESULT, 'RESLT')
 logging.Logger.result = partialmethod(logging.Logger.log, logging.RESULT)
 logging.result = partial(logging.log, logging.RESULT)
 
+
 def init_logging(level):
     logging.basicConfig(
         level=level,
@@ -28,6 +29,7 @@ def init_logging(level):
         format="[%(asctime)s] %(levelname)s     %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stdout)
+
 
 # Initialize parser
 parser = argparse.ArgumentParser()
@@ -38,6 +40,8 @@ parser.add_argument("-k", type=int, nargs="+", default=(2,),
                     help="number of covers k in graph (sequence separated by whitespace)")
 parser.add_argument("-w", "--weights", type=int, default=None,
                     help="weights of covers in graph (sequence separated by whitespace)")
+parser.add_argument("-e", "--extensive", action="store_true",
+                    help="check extensively for graph properties, not only those strictly necessary")
 parser.add_argument("-d", "--delete", action="store_true",
                     help="delete and re-initialize databases")
 parser.add_argument("-v", "--verbose", action='count', default=0,
@@ -50,8 +54,10 @@ parser.add_argument("--opt_verbose", action="store_true",
                     help="verbosity of integrality gap optimizer")
 parser.add_argument("--max_workers", type=int, default=var.CPU_COUNT,
                     help=f"<parallelization> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)")
-parser.add_argument("--chunksize", type=int, default=var.CHUNKSIZE,
-                    help=f"<parallelization> number of instances per chunk  (default: {var.CHUNKSIZE})")
+parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
+                    help=f"<parallelization> seconds of calculation per chunk  (default: {var.CHUNKTIME}s)")
+parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
+                    help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--chunks_num", type=int, default=var.N_CHUNKS,
                     help=f"<parallelization> number of chunks per batch  (default: {var.N_CHUNKS})")
 
@@ -72,12 +78,13 @@ if __name__ == '__main__':
         init_logging(level=logging.WARNING)
 
     process_opt = {"max_workers": args.max_workers,
-                   "chunksize": args.chunksize,
-                   "n_chunks": args.chunks_num}
+                   "chunktime": args.chunktime,
+                   "n_chunks": args.chunks_num,
+                   "max_chunksize": args.max_chunksize}
 
     for k in args.k:
         if args.weights is not None:
             assert sum(args.weights) == k
         for n in args.n:
-            CTSP.run(k=k, n=n, weights=args.weights, delete=args.delete, process_opt=process_opt, sql_verbose=args.sql_verbose,
-                     opt_verbose=args.opt_verbose)
+            CTSP.run(k=k, n=n, weights=args.weights, delete=args.delete, extensive=args.extensive,
+                     process_opt=process_opt, sql_verbose=args.sql_verbose, opt_verbose=args.opt_verbose)

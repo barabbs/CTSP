@@ -24,10 +24,6 @@ from sqlalchemy import Integer, LargeBinary, Boolean, Float, String, PickleType,
 from sqlalchemy.orm import mapped_column, relationship
 
 
-class Base(DeclarativeBase):
-    pass
-
-
 def calc_certificate(nauty_graph):
     return utl.timing(pynauty.certificate, nauty_graph)
 
@@ -58,6 +54,9 @@ def check_canon(coding):
 
 
 def get_ClovenGraph(N, K, W):
+    class Base(DeclarativeBase):
+        pass
+
     class ClovenGraph(Base):
         __tablename__ = "graphs"
 
@@ -279,7 +278,9 @@ def get_ClovenGraph(N, K, W):
                              time_wall=float(raw['Wall time']),
                              **kwargs)
 
-    return ClovenGraph
+    return Base.metadata, {'cloven_graph': ClovenGraph,
+                           'timings': Timings,
+                           'gap_info': GAPInfo}
 
 
 if __name__ == '__main__':

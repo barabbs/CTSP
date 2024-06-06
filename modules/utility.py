@@ -1,8 +1,9 @@
 from pyomo.core.expr import identify_variables
 import networkx as nx
 import pynauty
-import json, os, time
+import json, os, time, logging
 from modules import var
+import numpy as np
 
 GREEN = '\033[92m'
 RED = '\033[91m'
@@ -68,7 +69,8 @@ def bool_symb(t, file=False):
 
 
 def save_graph_file(graph, data):
-    path = os.path.join(var.GRAPH_DATA_DIR.format(k=graph.k, n=graph.n), var.GRAPH_FILENAME.format(coding=graph._coding))
+    path = os.path.join(var.GRAPH_DATA_DIR.format(k=graph.k, n=graph.n),
+                        var.GRAPH_FILENAME.format(coding=graph._coding))
     try:
         with open(path, 'w') as f:
             json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
@@ -77,7 +79,23 @@ def save_graph_file(graph, data):
         with open(path, 'w') as f:
             json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
 
+
+def save_run_info_file(infos, time_name):
+    infos["timings"][time_name] = time.time()
+    with open(var.RUN_INFO_FILEPATH.format(**infos["options"]), 'w') as f:
+        json.dump(infos, f, indent=var.RUN_INFO_INDENT)
+    return infos
+
+
 def timing(function, *args, **kwargs):
     start = time.process_time_ns()
     result = function(*args, **kwargs)
     return time.process_time_ns() - start, result
+
+
+def calc_chunksize(n, calc_type, workers, n_chunks, chunktime, max_chunksize, tot):
+    params = var.EST_CALC_TIME_PARAMS[calc_type]
+    calc_time = params[0] * np.exp(params[1] * n)
+    chunksize = int(np.ceil(chunktime / calc_time))
+    logging.stage(f"    Chunksize: {chunksize:<8} (estimated calc_time {calc_time:.2E})")
+    return min(chunksize, int(np.ceil(tot / (workers * n_chunks))), max_chunksize)
