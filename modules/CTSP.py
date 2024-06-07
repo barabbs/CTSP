@@ -108,27 +108,6 @@ def _parallel_run(n, calc_type, session, graph_class, function, res_handler, whe
         manager.stop()
 
 
-def _subt_extr_handler(graph, timing, props, **kwargs):
-    graph.set_property('subt', props[0])
-    graph.set_property('extr', props[1])
-    graph.set_timing('prop_subt_extr', timing)
-
-
-def _canon_handler(graph, timing, prop, **kwargs):
-    graph.set_property('canon', prop)
-    graph.set_timing('prop_canon', timing)
-
-
-def _certificate_handler(graph, timing, certificate, **kwargs):
-    graph.certificate = certificate
-    graph.set_timing('calc_certificate', timing)
-
-
-def _gap_handler(graph, timing, gap_raw, session, **kwargs):
-    graph.set_gap(*gap_raw, session=session)
-    graph.set_timing('calc_gap', timing)
-
-
 def _calc_certificates(n, graph_class, engine, process_opt, *args, **kwargs):
     with Session(engine) as session:
         logging.info("Starting CERTIFICATE calc")
