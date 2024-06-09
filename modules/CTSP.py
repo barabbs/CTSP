@@ -26,7 +26,7 @@ STRATEGIES = {
     },
     "E2": {
         'name': "extensive",
-        'descr': "(CERT + CANON + SUB_EXT) > GAP",
+        'descr': "CERT + CANON + SUB_EXT > GAP",
         'sequence': (
             (CERTIFICATE, {'where': {'certificate': None}}),
             (CANON, {'where': {'prop_canon': None}}),
@@ -106,8 +106,11 @@ def _commit_cached(session, models, cache, codings, start, manager):
 
 
 def _calc_helper(calc_type, n, k, weights, coding):
+    logging.stage(f"            {os.getpid():<8} {calc_type.upper():<10} {coding}")
     graph = Graph(n=n, k=k, weights=weights, coding=coding)
-    return graph.calculate(calc_type)
+    calc = graph.calculate(calc_type)
+    logging.stage(f"            {os.getpid():<8} ---------- {coding}")
+    return calc
 
 
 def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by=None, **options):
@@ -122,7 +125,7 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
             logging.trace(f"    Nothing to do :)")
             return
         chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
-        progressbar = manager.counter(total=tot, descr=f"{calc_type.upper():<10}", leave=False)
+        progressbar = manager.counter(total=tot, desc=f"{calc_type.upper():<10}", leave=False)
         logging.trace(f"    Total {tot:>8}    (chunksize {chunksize})")
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
         with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
