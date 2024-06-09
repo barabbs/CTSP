@@ -44,14 +44,14 @@ parser.add_argument("-w", "--weights", type=int, default=None,
 STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CTSP.STRATEGIES.items())
 STRATEGIES_TABLE = f"""
 
-num | name       |
-----|------------|{'-' * 36}
+    |    name    |            description
+----|------------|{'-' * 35}
 {STRATEGIES_ROWS}
     |            |
     
 """
 parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
-                    help="selected strategy for computation, from the following" + STRATEGIES_TABLE)
+                    help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY}" + STRATEGIES_TABLE)
 parser.add_argument("-d", "--delete", action="store_true",
                     help="delete and re-initialize databases")
 parser.add_argument("-v", "--verbose", action='count', default=0,
