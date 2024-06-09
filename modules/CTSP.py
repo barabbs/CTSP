@@ -86,23 +86,20 @@ COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
                 GAP_INFO: COMMIT_INSERT}
 
 
-def _commit_cached(session, models, cache, codings, start, manager):
+def _commit_cached(session, models, cache, codings, manager):
     try:
         m_names = cache[0].keys()
     except IndexError:
         logging.warning(f"    Nothing to commit!")
-        return start
     total = len(cache)
-    end = start + total
-    logging.stage(f"        Committing {total} results ({start} --> {end - 1})")
+    logging.stage(f"        Committing {total} results")
     commit_progbar = manager.counter(total=len(m_names), desc='committing', leave=False)
     for mod in m_names:
         session.execute(COMMIT_TYPES[mod](models[mod]),
-                        tuple(dict(id=codings[start + i], **result[mod]) for i, result in enumerate(cache)))
+                        tuple(dict(id=cod, **result[mod]) for cod, result in zip(codings, cache)))
         commit_progbar.update()
     session.commit()
     commit_progbar.close()
-    return end
 
 
 def _calc_helper(calc_type, n, k, weights, coding):
@@ -136,45 +133,41 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
 
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
         calc_func = partial(_calc_helper, calc_type, n, k, weights)
-        with ProcessPoolExecutor(max_workers=options["workers"],
-                                 initializer=lambda: logging.stage(
-                                     f"            Started worker {os.getpid():>8}({os.getpid() - os.getppid():<4})...")
-                                 ) as executor:
-            next_mapper = executor.map(calc_func, next(codings_gen), chunksize=chunksize)
-            logging.stage(f"        launched batch {0}")
+        with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
+            last_codings = next(codings_gen)
+            next_mapper = executor.map(calc_func, last_codings, chunksize=chunksize)
+            logging.stage(f"        batch {0:>6} of {batch_size}")
             batch_progbar.update()
             for batch, codings in enumerate(codings_gen):
                 mapper = next_mapper
                 next_mapper = executor.map(calc_func, codings, chunksize=chunksize)
-                logging.stage(f"        launched batch {batch + 1}")
+                logging.stage(f"        batch {batch + 1:>6} of {batch_size}")
                 batch_progbar.update()
                 for result in mapper:
                     cache.append(result)
                     result_progbar.update()
                     if time.time() > next_commit:
-                        committed = _commit_cached(session=session,
-                                                   models=models,
-                                                   cache=cache,
-                                                   codings=codings,
-                                                   start=committed,
-                                                   manager=manager)
+                        _commit_cached(session=session,
+                                       models=models,
+                                       cache=cache,
+                                       codings=last_codings,
+                                       manager=manager)
                         next_commit, cache = time.time() + options["commit_interval"], list()
+                last_codings = codings
         for result in next_mapper:
             cache.append(result)
             result_progbar.update()
             if time.time() > next_commit:
-                committed = _commit_cached(session=session,
-                                           models=models,
-                                           cache=cache,
-                                           codings=codings,
-                                           start=committed,
-                                           manager=manager)
+                _commit_cached(session=session,
+                               models=models,
+                               cache=cache,
+                               codings=last_codings,
+                               manager=manager)
                 next_commit, cache = time.time() + options["commit_interval"], list()
         _commit_cached(session=session,
                        models=models,
                        cache=cache,
                        codings=codings,
-                       start=committed,
                        manager=manager)
     batch_progbar.close()
     result_progbar.close()
@@ -208,7 +201,7 @@ OPTIONS
     utl.save_run_info_file(infos, start_time=start_time, time_name="database", delete=options['delete'])
     for calc_type, statements in STRATEGIES[strategy]['sequence']:
         logging.info(
-            f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '-')})")
+            f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
         start_time = time.time()
         _parallel_run(engine=engine, models=models,
                       n=n, k=k, weights=weights,

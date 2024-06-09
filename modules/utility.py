@@ -95,6 +95,7 @@ def save_run_info_file(infos, start_time, time_name, delete=False):
         if delete:
             os.remove(filepath)
             logging.info(f"Deleted run info file {os.path.basename(filepath)}")
+            times = dict()
         else:
             with open(filepath, 'r') as f:
                 times = json.load(f)['timings']
