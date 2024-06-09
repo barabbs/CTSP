@@ -92,7 +92,7 @@ def _commit_cached(session, models, cache, codings, manager):
     except IndexError:
         logging.warning(f"    Nothing to commit!")
     total = len(cache)
-    logging.stage(f"        Committing {total} results")
+    logging.trace(f"        Committing {total} results")
     commit_progbar = manager.counter(total=len(m_names), desc='committing', leave=False)
     for mod in m_names:
         session.execute(COMMIT_TYPES[mod](models[mod]),
@@ -121,7 +121,7 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
             return
         chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
 
-        batch_size = chunksize * options["num_chunks"]
+        batch_size = chunksize * options["chunks_per_batch"] * options["workers"]
         batches = int(np.ceil(tot / batch_size))
         batch_progbar = manager.counter(total=batches, desc=f"Batch ", leave=False)
         result_progbar = manager.counter(total=tot, desc=f"Result", leave=False)
@@ -136,12 +136,12 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
         with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
             last_codings = next(codings_gen)
             next_mapper = executor.map(calc_func, last_codings, chunksize=chunksize)
-            logging.stage(f"        batch {0:>6} of {batch_size}")
+            logging.stage(f"            batch {0:>6} of {batch_size}")
             batch_progbar.update()
             for batch, codings in enumerate(codings_gen):
                 mapper = next_mapper
                 next_mapper = executor.map(calc_func, codings, chunksize=chunksize)
-                logging.stage(f"        batch {batch + 1:>6} of {batch_size}")
+                logging.stage(f"            batch {batch + 1:>6} of {batch_size}")
                 batch_progbar.update()
                 for result in mapper:
                     cache.append(result)

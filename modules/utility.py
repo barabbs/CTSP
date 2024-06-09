@@ -107,9 +107,9 @@ def save_run_info_file(infos, start_time, time_name, delete=False):
         json.dump(infos, f, indent=var.RUN_INFO_INDENT)
 
 
-def calc_chunksize(n, calc_type, tot, workers, chunktime, num_chunks, **kwargs):
+def calc_chunksize(n, calc_type, tot, workers, chunktime, min_chunks, **kwargs):
     params = var.EST_CALC_TIME_PARAMS[calc_type]
     calc_time = params[0] * np.exp(params[1] * n)
     chunksize = int(np.ceil(chunktime / calc_time))
     logging.stage(f"    [est. chunksize: {chunksize:<8} (est. calc_time {calc_time:.2E})")
-    return min(chunksize, int(np.ceil(tot / (workers * num_chunks))))
+    return min(chunksize, int(np.ceil(tot / (workers * min_chunks))))
