@@ -51,7 +51,7 @@ STRATEGIES_TABLE = f"""
     
 """
 parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
-                    help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY}" + STRATEGIES_TABLE)
+                    help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY})" + STRATEGIES_TABLE)
 parser.add_argument("-d", "--delete", action="store_true",
                     help="delete and re-initialize databases")
 parser.add_argument("-v", "--verbose", action='count', default=0,
