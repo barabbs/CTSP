@@ -22,6 +22,7 @@ logging.Logger.result = partialmethod(logging.Logger.log, logging.RESULT)
 logging.result = partial(logging.log, logging.RESULT)
 
 
+
 def init_logging(level):
     logging.basicConfig(
         level=level,
@@ -40,17 +41,17 @@ parser.add_argument("-k", type=int, nargs="+", default=(2,),
                     help="number of covers k in graph (sequence separated by whitespace)")
 parser.add_argument("-w", "--weights", type=int, default=None,
                     help="weights of covers in graph (sequence separated by whitespace)")
-parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
-                    help="selected strategy for computation, from the following" +
-f"""
+STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CTSP.STRATEGIES.items())
+STRATEGIES_TABLE = f"""
 
 num | name       |
-----|------------|{'-'*36}
-{'\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CTSP.STRATEGIES.items())}
+----|------------|{'-' * 36}
+{STRATEGIES_ROWS}
     |            |
     
 """
-                    )
+parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
+                    help="selected strategy for computation, from the following" + STRATEGIES_TABLE)
 parser.add_argument("-d", "--delete", action="store_true",
                     help="delete and re-initialize databases")
 parser.add_argument("-v", "--verbose", action='count', default=0,
