@@ -1,31 +1,74 @@
-from modules.models import get_ClovenGraph
-from modules.models import calc_certificate, calc_gap, check_subt_extr, check_canon
+import time
+
+from modules.models import get_models, GRAPH, TIMINGS, GAP_INFO
+from modules.graph import Graph, CANON, SUBT_EXTR, CERTIFICATE, GAP
 from modules.combinatorics import graph_codings_generator
 from modules import var
 from modules import utility as utl
 
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 import os, logging
-from math import ceil
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, insert, update, bindparam
 from sqlalchemy.orm import Session
 import enlighten
 
+STRATEGIES = {
+    "E1": {
+        'name': "ext_nogap",
+        'descr': "CERT + CANON + SUB_EXT",
+        'sequence': (
+            (CERTIFICATE, {'where': {'certificate': None}}),
+            (CANON, {'where': {'prop_canon': None}}),
+            (SUBT_EXTR, {'where': {'prop_subt': None}}),
+        )
+    },
+    "E2": {
+        'name': "extensive",
+        'descr': "(CERT + CANON + SUB_EXT) > GAP",
+        'sequence': (
+            (CERTIFICATE, {'where': {'certificate': None}}),
+            (CANON, {'where': {'prop_canon': None}}),
+            (SUBT_EXTR, {'where': {'prop_subt': None}}),
+            (GAP, {'where': {'prop_subt': True,
+                             'prop_extr': True,
+                             'prop_canon': True,
+                             'gap': None},
+                   'group_by': 'certificate'}),
+        )
+    },
+    "O1": {
+        'name': "optimal_1",
+        'descr': "CERT > SUB_EXT > GAP",
+        'sequence': (
+            (CERTIFICATE, {'where': {'certificate': None}}),
+            (SUBT_EXTR, {'where': {'prop_subt': None},
+                         'group_by': 'certificate'}),
+            (GAP, {'where': {'prop_subt': True,
+                             'prop_extr': True,
+                             'gap': None},
+                   'group_by': 'certificate'}),
+        )
+    },
 
-def initialize_database(metadata, graph_class, n, k, w, delete=False, verbose=False):
-    path = var.DATABASE_FILEPATH.format(k=k, n=n, weights="-".join(str(i) for i in w))
+}
+
+
+def initialize_database(metadata, graph_class, n, k, weights, strategy, delete=False, sql_verbose=False, **options):
+    path = var.DATABASE_FILEPATH.format(k=k, n=n, weights="-".join(str(i) for i in weights), strategy=strategy)
     if delete and os.path.exists(path):
         os.remove(path)
         logging.info(f"Deleted database {os.path.basename(path)}")
-    engine = create_engine(f"sqlite:///{path}", echo=verbose)
+    engine = create_engine(f"sqlite:///{path}", echo=sql_verbose)
     if not os.path.exists(path):
         logging.info(f"Generating database {os.path.basename(path)}")
         try:
             metadata.create_all(engine)
             with Session(engine) as session:
-                graphs = tuple(graph_class(coding=c) for c in graph_codings_generator(n, k))
-                session.add_all(graphs)
+
+                session.execute(insert(graph_class),
+                                tuple(dict(coding=c, parts=p) for c, p in graph_codings_generator(n, k)))
                 session.commit()
         except (Exception, KeyboardInterrupt) as e:
             logging.warning(f"Interupted - Deleting database {os.path.basename(path)}")
@@ -35,184 +78,106 @@ def initialize_database(metadata, graph_class, n, k, w, delete=False, verbose=Fa
     return engine
 
 
-def _get_next_batch(graphs_gen):
+COMMIT_UPDATE = lambda c: update(c).where(c.coding == bindparam("id"))
+COMMIT_INSERT = lambda c: insert(c).values(coding=bindparam("id"))
+
+COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
+                TIMINGS: COMMIT_UPDATE,
+                GAP_INFO: COMMIT_INSERT}
+
+
+def _commit_cached(session, models, cache, codings, start, manager):
     try:
-        return next(graphs_gen)
-    except StopIteration:
-        return
-
-
-def _get_batch_run(executor, function, graphs, attrs, ex_attrs, params, chunksize):
-    return executor.map(function,  # TODO: select right chunksize!
-                        *tuple((getattr(g, attr) for g in graphs) for attr in (attrs or tuple())),
-                        *tuple((getattr(g, attr)() for g in graphs) for attr in (ex_attrs or tuple())),
-                        *tuple((p for g in graphs) for p in (params or tuple())),
-                        chunksize=chunksize)
-
-
-def _handle_batch_result(manager, session, batch_run, graphs, res_handler):
-    handle_bar = manager.counter(total=len(graphs), desc='Handle', leave=False)
-    for graph, result in zip(graphs, batch_run):
-        res_handler(graph, *result, session=session)
-        handle_bar.update()
-    logging.stage(f"            Committing...")
+        m_names = cache[0].keys()
+    except IndexError:
+        logging.trace(f"    Nothing to commit")
+        return start
+    total = len(cache)
+    end = start + total
+    logging.stage(f"        committing {total} results ({start} --> {end - 1})")
+    progressbar = manager.counter(total=len(m_names), desc='committing', leave=False)
+    for mod in m_names:
+        session.execute(COMMIT_TYPES[mod](models[mod]),
+                        tuple(dict(id=codings[start + i], **result[mod]) for i, result in enumerate(cache)))
+        progressbar.update()
     session.commit()
-    handle_bar.close()
+    progressbar.close()
+    return end
 
 
-def _parallel_run(n, calc_type, session, graph_class, function, res_handler, where_smnt, group_by_col=None,
-                  attrs=None, ex_attrs=None, params=None, max_workers=None, chunktime=None, n_chunks=None,
-                  max_chunksize=None):
+def _calc_helper(calc_type, n, k, weights, coding):
+    graph = Graph(n=n, k=k, weights=weights, coding=coding)
+    return graph.calculate(calc_type)
+
+
+def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by=None, **options):
     manager = enlighten.get_manager()
-
-    q_smnt = session.query(graph_class).where(*where_smnt)
-    q_smnt = q_smnt if group_by_col is None else q_smnt.group_by(group_by_col)
-    tot = q_smnt.count()
-    if tot == 0:
-        logging.trace(f"    Nothing to do :)")
-        return
-
-    chunksize = utl.calc_chunksize(n, calc_type, max_workers, n_chunks, chunktime, max_chunksize, tot)
-    batch_size = max_workers * chunksize * n_chunks
-    i, n_batches = 1, ceil(tot / batch_size)
-    batches_bar = manager.counter(total=n_batches, desc='Batches', leave=False)
-    logging.trace(f"    Total {tot:>8}    ({n_batches} batches of {batch_size} / chunksize {chunksize})")
-
-    statement = select(graph_class).where(*where_smnt)
-    statement = statement if group_by_col is None else statement.group_by(group_by_col)
-    graphs_gen = session.scalars(statement.execution_options(yield_per=batch_size)).partitions()
-
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        logging.stage(f"         => PrLoad {i:>5}/{n_batches}")
-        next_batch = _get_next_batch(graphs_gen)
-        batch_run, graphs = None, None
-        while next_batch is not None:
-            logging.trace(f"        Batch {i:>5}/{n_batches}")
-            last_graphs, last_batch_run = graphs, batch_run
-            graphs = next_batch
-            logging.stage(f"         => Launch {i:>5}/{n_batches}")
-            batch_run = _get_batch_run(executor, function, graphs, attrs, ex_attrs, params, chunksize)
-            logging.stage(f"         => PrLoad {i + 1:>5}/{n_batches}")
-            next_batch = _get_next_batch(graphs_gen)
-            if next_batch is None:
-                logging.stage(f"            Nothing more to load!")
-            if last_batch_run is not None:
-                logging.stage(f"         => Handle {i - 1:>5}/{n_batches}")
-                _handle_batch_result(manager, session, last_batch_run, last_graphs, res_handler)
-            batches_bar.update()
-            i += 1
-        logging.trace(f"        Finishing up...")
-        logging.stage(f"         => Handle {i - 1:>5}/{n_batches}")
-        _handle_batch_result(manager, session, batch_run, graphs, res_handler)
-        batches_bar.close()
-        manager.stop()
-
-
-def _calc_certificates(n, graph_class, engine, process_opt, *args, **kwargs):
     with Session(engine) as session:
-        logging.info("Starting CERTIFICATE calc")
-        _parallel_run(n=n,
-                      calc_type="cert",
-                      session=session,
-                      graph_class=graph_class,
-                      where_smnt=(graph_class.certificate.is_(None),),
-                      function=calc_certificate,
-                      res_handler=_certificate_handler,
-                      ex_attrs=("get_nauty_graph",),
-                      **process_opt)
-        logging.info("Finished CERTIFICATE calc")
+        where_smnt = tuple(getattr(models[GRAPH], attr).is_(val) for attr, val in where.items())
+        group_by_smnt = None if group_by is None else getattr(models[GRAPH], group_by)
+        statement = select(models[GRAPH].coding).where(*where_smnt).group_by(group_by_smnt)
+        codings = tuple(*zip(*session.execute(statement).all()))
+        tot = len(codings)
+        if tot == 0:
+            logging.trace(f"    Nothing to do :)")
+            return
+        chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
+        progressbar = manager.counter(total=tot, descr=f"{calc_type.upper():<10}", leave=False)
+        logging.trace(f"    Total {tot:>8}    (chunksize {chunksize})")
+        next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
+        with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
+            calc_func = partial(_calc_helper, calc_type, n, k, weights)
+            mapper = executor.map(calc_func, codings, chunksize=chunksize)
+            for result in mapper:
+                cache.append(result)
+                progressbar.update()
+                if time.time() > next_commit:
+                    committed = _commit_cached(session=session,
+                                               models=models,
+                                               cache=cache,
+                                               codings=codings,
+                                               start=committed,
+                                               manager=manager)
+                    next_commit, cache = time.time() + options["commit_interval"], list()
+        _commit_cached(session=session,
+                       models=models,
+                       cache=cache,
+                       codings=codings,
+                       start=committed,
+                       manager=manager)
+    progressbar.close()
+    manager.stop()
 
 
-def _check_subt_extr(n, graph_class, engine, extensive, process_opt, *args, **kwargs):
-    group_by_col = graph_class.certificate if not extensive else None
-    with Session(engine) as session:
-        logging.info("Starting SUBT & EXTR check")
-        _parallel_run(n=n,
-                      calc_type="subt_extr",
-                      session=session,
-                      graph_class=graph_class,
-                      where_smnt=(graph_class.prop_subt.is_(None),),
-                      group_by_col=group_by_col,
-                      function=check_subt_extr,
-                      res_handler=_subt_extr_handler,
-                      attrs=("n",),
-                      ex_attrs=("get_adjacency_matrix",),
-                      **process_opt)
-        logging.info("Finished SUBT & EXTR check")
-
-
-def _check_canon(n, graph_class, engine, extensive, process_opt, *args, **kwargs):
-    if not extensive:
-        logging.info("Skipping CANON check")
-        return
-    with Session(engine) as session:
-        logging.info("Starting CANON check")
-        _parallel_run(n=n,
-                      calc_type="canon",
-                      session=session,
-                      graph_class=graph_class,
-                      where_smnt=(graph_class.prop_canon.is_(None),),
-                      function=check_canon,
-                      res_handler=_canon_handler,
-                      attrs=("_coding",),
-                      **process_opt)  # TODO: Do not access private attribute!
-        logging.info("Finished CANON check")
-
-
-def _calc_gaps(n, graph_class, engine, extensive, process_opt, opt_verbose, *args, **kwargs):
-    if extensive:
-        where_smnt = (graph_class.prop_subt, graph_class.prop_extr, graph_class.prop_canon, graph_class.gap.is_(None))
-    else:
-        where_smnt = (graph_class.prop_subt.is_(True), graph_class.prop_extr.is_(True), graph_class.gap.is_(None))
-    with Session(engine) as session:
-        logging.info("Starting GAP calc")
-        _parallel_run(n=n,
-                      calc_type="gap",
-                      session=session,
-                      graph_class=graph_class,
-                      where_smnt=where_smnt,
-                      group_by_col=graph_class.certificate,
-                      function=calc_gap,
-                      res_handler=_gap_handler,
-                      attrs=("n",),
-                      ex_attrs=("get_adjacency_matrix",),
-                      params=(opt_verbose,),
-                      **process_opt, )
-        logging.info("Finished GAP calc")
-
-
-def run(n, k, weights, delete, extensive, process_opt, sql_verbose, opt_verbose):
+def run(n, k, weights, strategy, **options):
     weights = weights or (1,) * k
-    info = {"host": os.uname()[1],
-            "options": {
-                "n": n,
-                "k": k,
-                "weights": weights,
-                "delete": int(delete),
-                "extensive": int(extensive),
-                "process_opt": process_opt,
-                "sql_verbose": sql_verbose,
-                "opt_verbose": opt_verbose,
-                "strategy_num": var.STRATEGY_NUM,
-                "est_calc_time_params": var.EST_CALC_TIME_PARAMS
-            },
-            "timings": dict()}
-    print("\n\n" + "-" * 96 +
-          f"\nn={n}, k={k}, w={weights}  |  strategy #{var.STRATEGY_NUM}  |  {'del ' if delete else ''}{'ext ' if extensive else ''}\n" +
-          ", ".join(f"{i}: {v}" for i, v in process_opt.items()) + "\n" +
-          "-" * 96 + "\n\n")
-    info = utl.save_run_info_file(info, "start")
-    metadata, models = get_ClovenGraph(n, k, weights)
-    engine = initialize_database(metadata, models['cloven_graph'], n, k, weights, delete, sql_verbose)
-    info = utl.save_run_info_file(info, "database")
-    _calc_certificates(n=n, graph_class=models['cloven_graph'], engine=engine, extensive=extensive,
-                       process_opt=process_opt)
-    info = utl.save_run_info_file(info, "cert")
-    _check_subt_extr(n=n, graph_class=models['cloven_graph'], engine=engine, extensive=extensive,
-                     process_opt=process_opt)
-    info = utl.save_run_info_file(info, "subt_extr")
-    _check_canon(n=n, graph_class=models['cloven_graph'], engine=engine, extensive=extensive, process_opt=process_opt)
-    info = utl.save_run_info_file(info, "canon")
-    _calc_gaps(n=n, graph_class=models['cloven_graph'], engine=engine, extensive=extensive, process_opt=process_opt,
-               opt_verbose=opt_verbose)
-    info = utl.save_run_info_file(info, "gap")
+    options.update({"est_calc_time_params": var.EST_CALC_TIME_PARAMS})
+    infos = {"host": os.uname()[1],
+             "n": n, "k": k, "weights": weights,
+             "strategy": strategy,
+             "options": options}
+    logging.info(f"""
+    
+{'-' * 128}
+PARAMS   n={n}, k={k}, w={weights}
+
+STRATEGY  {strategy}, {STRATEGIES[strategy]['name']:<12}  [{STRATEGIES[strategy]['descr']}]
+
+OPTIONS
+  - {'\n  - '.join(f'{i + ':':<23} {v}' for i, v in options.items())}
+{'-' * 128}
+
+""")
+    start_time = time.time()
+    metadata, models = get_models(n, k, weights)
+    engine = initialize_database(metadata=metadata, graph_class=models[GRAPH],
+                                 n=n, k=k, weights=weights, strategy=strategy, **options)
+    utl.save_run_info_file(infos, start_time=start_time, time_name="database", delete=options['delete'])
+    for calc_type, statements in STRATEGIES[strategy]['sequence']:
+        logging.info(
+            f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '-')})")
+        start_time = time.time()
+        _parallel_run(engine=engine, models=models,
+                      n=n, k=k, weights=weights,
+                      calc_type=calc_type, **statements, **options)
+        utl.save_run_info_file(infos, start_time=start_time, time_name=calc_type)

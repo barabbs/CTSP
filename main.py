@@ -32,7 +32,7 @@ def init_logging(level):
 
 
 # Initialize parser
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
 parser.add_argument("-n", type=int, nargs="+",
                     help="number of nodes n in graph  (sequence separated by whitespace)", required=True)
@@ -40,26 +40,37 @@ parser.add_argument("-k", type=int, nargs="+", default=(2,),
                     help="number of covers k in graph (sequence separated by whitespace)")
 parser.add_argument("-w", "--weights", type=int, default=None,
                     help="weights of covers in graph (sequence separated by whitespace)")
-parser.add_argument("-e", "--extensive", action="store_true",
-                    help="check extensively for graph properties, not only those strictly necessary")
+parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
+                    help="selected strategy for computation, from the following" +
+f"""
+
+num | name       |
+----|------------|{'-'*36}
+{'\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CTSP.STRATEGIES.items())}
+    |            |
+    
+"""
+                    )
 parser.add_argument("-d", "--delete", action="store_true",
                     help="delete and re-initialize databases")
 parser.add_argument("-v", "--verbose", action='count', default=0,
                     help="increase output verbosity")
 parser.add_argument("-q", "--quiet", action='count', default=0,
                     help="decrease output verbosity")
+parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
+                    help=f"<parallelization> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)")
+parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
+                    help=f"<parallelization> approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)")
+parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
+                    help=f"<parallelization> minimum number of chunks  (default: {var.MIN_CHUNKS})")
+# parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
+#                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
+parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
+                    help=f"seconds between commits to database  (default: {var.COMMIT_INTERVAL}s)")
 parser.add_argument("--sql_verbose", action="store_true",
                     help="verbosity of SqlAlchemy backend")
 parser.add_argument("--opt_verbose", action="store_true",
                     help="verbosity of integrality gap optimizer")
-parser.add_argument("--max_workers", type=int, default=var.CPU_COUNT,
-                    help=f"<parallelization> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)")
-parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
-                    help=f"<parallelization> seconds of calculation per chunk  (default: {var.CHUNKTIME}s)")
-parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
-                    help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
-parser.add_argument("--chunks_num", type=int, default=var.N_CHUNKS,
-                    help=f"<parallelization> number of chunks per batch  (default: {var.N_CHUNKS})")
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -70,21 +81,21 @@ if __name__ == '__main__':
         init_logging(level=logging.TRACE)
     elif verbosity == 2:
         init_logging(level=logging.STAGE)
-    elif verbosity == 3:
-        init_logging(level=logging.RESULT)
-    elif verbosity >= 4:
+    elif verbosity >= 3:
         init_logging(level=logging.DEBUG)
     elif verbosity <= -1:
         init_logging(level=logging.WARNING)
 
-    process_opt = {"max_workers": args.max_workers,
-                   "chunktime": args.chunktime,
-                   "n_chunks": args.chunks_num,
-                   "max_chunksize": args.max_chunksize}
+    options = {"delete": args.delete,
+               "workers": args.workers,
+               "chunktime": args.chunktime,
+               "min_chunks": args.min_chunks,
+               "commit_interval": args.commit_interval,
+               "sql_verbose": args.sql_verbose,
+               "opt_verbose": args.opt_verbose}
 
     for k in args.k:
         if args.weights is not None:
             assert sum(args.weights) == k
         for n in args.n:
-            CTSP.run(k=k, n=n, weights=args.weights, delete=args.delete, extensive=args.extensive,
-                     process_opt=process_opt, sql_verbose=args.sql_verbose, opt_verbose=args.opt_verbose)
+            CTSP.run(k=k, n=n, weights=args.weights, strategy=args.strategy.upper(), **options)

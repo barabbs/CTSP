@@ -55,6 +55,13 @@ def get_adjacency_matrix(n, k, graph, weights):
     return adj
 
 
+def convert_raw_gurobi_info(raw):
+    return {'sol_status': raw['Status'],
+            'sol_term_cond': raw['Termination condition'],
+            'time_proc': raw['Time'],
+            'time_wall': float(raw['Wall time'])}
+
+
 def seqence_to_str(cycles, sep=" "):
     # TODO: extend hex for i>15
     return sep.join("".join(f'{i:X}' for i in c) for c in cycles)
@@ -80,22 +87,26 @@ def save_graph_file(graph, data):
             json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
 
 
-def save_run_info_file(infos, time_name):
-    infos["timings"][time_name] = time.time()
-    with open(var.RUN_INFO_FILEPATH.format(**infos["options"]), 'w') as f:
+def save_run_info_file(infos, start_time, time_name, delete=False):
+    filepath = var.RUN_INFO_FILEPATH.format(**infos)
+    try:
+        if delete:
+            os.remove(filepath)
+            logging.info(f"Deleted run info file {os.path.basename(filepath)}")
+        else:
+            with open(filepath, 'r') as f:
+                times = json.load(f)['timings']
+    except FileNotFoundError:
+        times = dict()
+    times[time_name] = time.time() - start_time + times.get(time_name, 0)
+    infos['timings'] = times
+    with open(filepath, 'w') as f:
         json.dump(infos, f, indent=var.RUN_INFO_INDENT)
-    return infos
 
 
-def timing(function, *args, **kwargs):
-    start = time.process_time_ns()
-    result = function(*args, **kwargs)
-    return time.process_time_ns() - start, result
-
-
-def calc_chunksize(n, calc_type, workers, n_chunks, chunktime, max_chunksize, tot):
+def calc_chunksize(n, calc_type, tot, workers, chunktime, min_chunks, **kwargs):
     params = var.EST_CALC_TIME_PARAMS[calc_type]
     calc_time = params[0] * np.exp(params[1] * n)
     chunksize = int(np.ceil(chunktime / calc_time))
-    logging.stage(f"    Chunksize: {chunksize:<8} (estimated calc_time {calc_time:.2E})")
-    return min(chunksize, int(np.ceil(tot / (workers * n_chunks))), max_chunksize)
+    logging.stage(f"    [est. chunksize: {chunksize:<8} (est. calc_time {calc_time:.2E})")
+    return min(chunksize, int(np.ceil(tot / (workers * min_chunks))))
