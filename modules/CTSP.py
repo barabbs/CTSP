@@ -152,14 +152,14 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
                                codings=last_codings,
                                manager=manager)
                 last_codings = codings
-        for result in next_mapper:
-            cache.append(result)
-            result_progbar.update()
-        _commit_cached(session=session,
-                       models=models,
-                       cache=cache,
-                       codings=last_codings,
-                       manager=manager)
+            for result in next_mapper:
+                cache.append(result)
+                result_progbar.update()
+            _commit_cached(session=session,
+                           models=models,
+                           cache=cache,
+                           codings=last_codings,
+                           manager=manager)
     batch_progbar.close()
     result_progbar.close()
     manager.stop()
