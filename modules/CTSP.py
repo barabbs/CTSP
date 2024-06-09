@@ -128,9 +128,12 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
         progressbar = manager.counter(total=tot, desc=f"{calc_type.upper():<10}", leave=False)
         logging.trace(f"    Total {tot:>8}    (chunksize {chunksize})")
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
-        with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
+        with ProcessPoolExecutor(max_workers=options["workers"],
+                                 initializer=lambda: logging.stage(f"            Started worker {os.getpid() - os.getppid():<4} ({os.getpid():<8}) ...")
+                                 ) as executor:
             calc_func = partial(_calc_helper, calc_type, n, k, weights)
             mapper = executor.map(calc_func, codings, range(tot), chunksize=chunksize)
+            logging.stage(f"            Launched!")
             for i, result in enumerate(mapper):
                 cache.append(result)
                 logging.stage(f"            Received {i}")
