@@ -105,11 +105,11 @@ def _commit_cached(session, models, cache, codings, start, manager):
     return end
 
 
-def _calc_helper(calc_type, n, k, weights, coding):
-    logging.stage(f"            {os.getpid() - os.getppid():<4} ({os.getpid():<8})  {calc_type.upper():<10} {coding}")
+def _calc_helper(calc_type, n, k, weights, coding, num):
+    logging.stage(f"            {os.getpid() - os.getppid():<4} ({os.getpid():<8})  {num:>8}  {calc_type.upper():<10} {coding}")
     graph = Graph(n=n, k=k, weights=weights, coding=coding)
     calc = graph.calculate(calc_type)
-    logging.stage(f"            {os.getpid() - os.getppid():<4} ({os.getpid():<8})  ---------- {coding}")
+    logging.stage(f"            {os.getpid() - os.getppid():<4} ({os.getpid():<8})  {num:>8}  ---------- {coding}")
     return calc
 
 
@@ -130,9 +130,10 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
         with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
             calc_func = partial(_calc_helper, calc_type, n, k, weights)
-            mapper = executor.map(calc_func, codings, chunksize=chunksize)
-            for result in mapper:
+            mapper = executor.map(calc_func, codings, range(len(tot)), chunksize=chunksize)
+            for i, result in enumerate(mapper):
                 cache.append(result)
+                logging.stage(f"            Received {i}")
                 progressbar.update()
                 if time.time() > next_commit:
                     committed = _commit_cached(session=session,
