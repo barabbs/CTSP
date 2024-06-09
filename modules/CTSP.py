@@ -106,10 +106,10 @@ def _commit_cached(session, models, cache, codings, start, manager):
 
 
 def _calc_helper(calc_type, n, k, weights, coding):
-    logging.stage(f"            {os.getpid():<8} {calc_type.upper():<10} {coding}")
+    logging.stage(f"            {os.getpid() - os.getppid():<4} {calc_type.upper():<10} {coding}")
     graph = Graph(n=n, k=k, weights=weights, coding=coding)
     calc = graph.calculate(calc_type)
-    logging.stage(f"            {os.getpid():<8} ---------- {coding}")
+    logging.stage(f"            {os.getpid() - os.getppid():<4} ---------- {coding}")
     return calc
 
 
