@@ -156,7 +156,7 @@ def run(n, k, weights, strategy, **options):
              "n": n, "k": k, "weights": weights,
              "strategy": strategy,
              "options": options}
-    options_descr = '\n  - '.join(f'{i + ':':<23} {v}' for i, v in options.items())
+    options_descr = '\n  - '.join(f"{i + ':':<23} {v}" for i, v in options.items())
     logging.info(f"""
     
 {'-' * 128}
