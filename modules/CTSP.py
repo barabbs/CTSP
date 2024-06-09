@@ -130,7 +130,7 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
         with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
             calc_func = partial(_calc_helper, calc_type, n, k, weights)
-            mapper = executor.map(calc_func, codings, range(len(tot)), chunksize=chunksize)
+            mapper = executor.map(calc_func, codings, range(tot), chunksize=chunksize)
             for i, result in enumerate(mapper):
                 cache.append(result)
                 logging.stage(f"            Received {i}")
