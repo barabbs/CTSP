@@ -88,7 +88,9 @@ def save_graph_file(graph, data):
 
 
 def save_run_info_file(infos, start_time, time_name, delete=False):
-    filepath = var.RUN_INFO_FILEPATH.format(**infos)
+    filepath = var.RUN_INFO_FILEPATH.format(k=infos['k'], n=infos['n'],
+                                            weights="-".join(str(i) for i in infos['weights']),
+                                            strategy=infos['strategy'])
     try:
         if delete:
             os.remove(filepath)
