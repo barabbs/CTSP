@@ -62,8 +62,8 @@ parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
                     help=f"<parallelization> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)")
 parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
                     help=f"<parallelization> approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)")
-parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
-                    help=f"<parallelization> minimum number of chunks  (default: {var.MIN_CHUNKS})")
+parser.add_argument("--num_chunks", type=int, default=var.NUM_CHUNKS,
+                    help=f"<parallelization> number of chunks per batch  (default: {var.NUM_CHUNKS})")
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     options = {"delete": args.delete,
                "workers": args.workers,
                "chunktime": args.chunktime,
-               "min_chunks": args.min_chunks,
+               "num_chunks": args.num_chunks,
                "commit_interval": args.commit_interval,
                "sql_verbose": args.sql_verbose,
                "opt_verbose": args.opt_verbose}

@@ -22,7 +22,7 @@ CALC_GAP = 'gap'
 CPU_COUNT = os.cpu_count()
 CHUNKTIME = 1
 COMMIT_INTERVAL = 60
-MIN_CHUNKS = 10
+NUM_CHUNKS = 10
 # MAX_CHUNKSIZE = 100
 EST_CALC_TIME_PARAMS = {
     "subt_extr": (1e-06, 0.95),

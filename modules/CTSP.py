@@ -1,5 +1,3 @@
-import time
-
 from modules.models import get_models, GRAPH, TIMINGS, GAP_INFO
 from modules.graph import Graph, CANON, SUBT_EXTR, CERTIFICATE, GAP
 from modules.combinatorics import graph_codings_generator
@@ -9,6 +7,8 @@ from modules import utility as utl
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import os, logging
+import time
+import numpy as np
 
 from sqlalchemy import create_engine, select, insert, update, bindparam
 from sqlalchemy.orm import Session
@@ -90,26 +90,25 @@ def _commit_cached(session, models, cache, codings, start, manager):
     try:
         m_names = cache[0].keys()
     except IndexError:
-        logging.trace(f"    Nothing to commit")
+        logging.warning(f"    Nothing to commit!")
         return start
     total = len(cache)
     end = start + total
-    logging.stage(f"        committing {total} results ({start} --> {end - 1})")
-    progressbar = manager.counter(total=len(m_names), desc='committing', leave=False)
+    logging.stage(f"        Committing {total} results ({start} --> {end - 1})")
+    commit_progbar = manager.counter(total=len(m_names), desc='committing', leave=False)
     for mod in m_names:
         session.execute(COMMIT_TYPES[mod](models[mod]),
                         tuple(dict(id=codings[start + i], **result[mod]) for i, result in enumerate(cache)))
-        progressbar.update()
+        commit_progbar.update()
     session.commit()
-    progressbar.close()
+    commit_progbar.close()
     return end
 
 
-def _calc_helper(calc_type, n, k, weights, coding, num):
-    logging.stage(f"            {os.getpid() - os.getppid():<4} ({os.getpid():<8})  {num:>8}  {calc_type.upper():<10} {coding}")
+def _calc_helper(calc_type, n, k, weights, coding):
+    # logging.stage(f"            {os.getpid():>8}({os.getpid() - os.getppid():<4})  {num:>8}  {calc_type.upper():<10} {coding}")
     graph = Graph(n=n, k=k, weights=weights, coding=coding)
     calc = graph.calculate(calc_type)
-    logging.stage(f"            {os.getpid() - os.getppid():<4} ({os.getpid():<8})  {num:>8}  ---------- {coding}")
     return calc
 
 
@@ -118,41 +117,67 @@ def _parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by
     with Session(engine) as session:
         where_smnt = tuple(getattr(models[GRAPH], attr).is_(val) for attr, val in where.items())
         group_by_smnt = None if group_by is None else getattr(models[GRAPH], group_by)
-        statement = select(models[GRAPH].coding).where(*where_smnt).group_by(group_by_smnt)
-        codings = tuple(*zip(*session.execute(statement).all()))
-        tot = len(codings)
+
+        tot = session.query(models[GRAPH]).where(*where_smnt).group_by(group_by_smnt).count()
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return
         chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
-        progressbar = manager.counter(total=tot, desc=f"{calc_type.upper():<10}", leave=False)
-        logging.trace(f"    Total {tot:>8}    (chunksize {chunksize})")
+
+        batch_size = chunksize * options["num_chunks"]
+        batches = int(np.ceil(tot / batch_size))
+        batch_progbar = manager.counter(total=batches, desc=f"Batch ", leave=False)
+        result_progbar = manager.counter(total=tot, desc=f"Result", leave=False)
+
+        logging.trace(f"    Total {tot:>8}    (chunksize {chunksize} / {batches} batches of {batch_size})")
+
+        statement = select(models[GRAPH].coding).where(*where_smnt).group_by(group_by_smnt)
+        codings_gen = session.scalars(statement).partitions(size=batch_size)
+
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
+        calc_func = partial(_calc_helper, calc_type, n, k, weights)
         with ProcessPoolExecutor(max_workers=options["workers"],
-                                 initializer=lambda: logging.stage(f"            Started worker {os.getpid() - os.getppid():<4} ({os.getpid():<8}) ...")
+                                 initializer=lambda: logging.stage(
+                                     f"            Started worker {os.getpid():>8}({os.getpid() - os.getppid():<4})...")
                                  ) as executor:
-            calc_func = partial(_calc_helper, calc_type, n, k, weights)
-            mapper = executor.map(calc_func, codings, range(tot), chunksize=chunksize)
-            logging.stage(f"            Launched!")
-            for i, result in enumerate(mapper):
-                cache.append(result)
-                logging.stage(f"            Received {i}")
-                progressbar.update()
-                if time.time() > next_commit:
-                    committed = _commit_cached(session=session,
-                                               models=models,
-                                               cache=cache,
-                                               codings=codings,
-                                               start=committed,
-                                               manager=manager)
-                    next_commit, cache = time.time() + options["commit_interval"], list()
+            next_mapper = executor.map(calc_func, next(codings_gen), chunksize=chunksize)
+            logging.stage(f"        launched batch {0}")
+            batch_progbar.update()
+            for batch, codings in enumerate(codings_gen):
+                mapper = next_mapper
+                next_mapper = executor.map(calc_func, codings, chunksize=chunksize)
+                logging.stage(f"        launched batch {batch + 1}")
+                batch_progbar.update()
+                for result in mapper:
+                    cache.append(result)
+                    result_progbar.update()
+                    if time.time() > next_commit:
+                        committed = _commit_cached(session=session,
+                                                   models=models,
+                                                   cache=cache,
+                                                   codings=codings,
+                                                   start=committed,
+                                                   manager=manager)
+                        next_commit, cache = time.time() + options["commit_interval"], list()
+        for result in next_mapper:
+            cache.append(result)
+            result_progbar.update()
+            if time.time() > next_commit:
+                committed = _commit_cached(session=session,
+                                           models=models,
+                                           cache=cache,
+                                           codings=codings,
+                                           start=committed,
+                                           manager=manager)
+                next_commit, cache = time.time() + options["commit_interval"], list()
         _commit_cached(session=session,
                        models=models,
                        cache=cache,
                        codings=codings,
                        start=committed,
                        manager=manager)
-    progressbar.close()
+    batch_progbar.close()
+    result_progbar.close()
     manager.stop()
 
 
