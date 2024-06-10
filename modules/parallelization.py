@@ -90,7 +90,8 @@ def parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by=
 
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
         mapper = tuple()
-        with ProcessPoolExecutor(max_workers=options["workers"]) as executor:
+        with ProcessPoolExecutor(max_workers=options["workers"], initializer=os.nice, initargs=(var.PROCESSES_NICENESS,)
+                                 ) as executor:
             for pre_batch in range(options["preloaded_batches"]):
                 mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, calc_func, chunksize,
                                        batch_progbar)
