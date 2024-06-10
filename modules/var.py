@@ -9,7 +9,7 @@ RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_s{strategy}
 RUN_INFO_INDENT = 4
 
 # Table names
-GRAPH_TABLE = 'graph'
+GRAPH_TABLE = 'graphs'
 TIMINGS_TABLE = 'timings'
 GAP_INFO_TABLE = 'gap_info'
 
@@ -22,9 +22,9 @@ CALC_GAP = 'gap'
 CPU_COUNT = os.cpu_count()
 CHUNKTIME = 1
 COMMIT_INTERVAL = 60
-MIN_CHUNKS = 10
-CHUNKS_PER_BATCH = 100
-# MAX_CHUNKSIZE = 100
+MIN_CHUNKS = 5
+CHUNKS_PER_BATCH = 10
+PRELOADED_BATCHES = 1
 EST_CALC_TIME_PARAMS = {
     "subt_extr": (1e-06, 0.95),
     "canon": (1e-04, 0),

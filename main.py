@@ -1,4 +1,4 @@
-from modules import CTSP
+from modules import ctsp
 from modules import var
 import argparse
 
@@ -41,7 +41,7 @@ parser.add_argument("-k", type=int, nargs="+", default=(2,),
                     help="number of covers k in graph (sequence separated by whitespace)")
 parser.add_argument("-w", "--weights", type=int, default=None,
                     help="weights of covers in graph (sequence separated by whitespace)")
-STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CTSP.STRATEGIES.items())
+STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in ctsp.STRATEGIES.items())
 STRATEGIES_TABLE = f"""
 
     |    name    |            description
@@ -66,6 +66,8 @@ parser.add_argument("--chunks_per_batch", type=int, default=var.CHUNKS_PER_BATCH
                     help=f"<parallelization> number of chunks per batch  (default: {var.CHUNKS_PER_BATCH})")
 parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
                     help=f"<parallelization> min chunks per run  (default: {var.MIN_CHUNKS})")
+parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCHES,
+                    help=f"<parallelization> batches to preload  (default: {var.PRELOADED_BATCHES})")
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
@@ -94,6 +96,7 @@ if __name__ == '__main__':
                "chunktime": args.chunktime,
                "chunks_per_batch": args.chunks_per_batch,
                "min_chunks": args.min_chunks,
+               "preloaded_batches": args.preloaded_batches,
                "commit_interval": args.commit_interval,
                "sql_verbose": args.sql_verbose,
                "opt_verbose": args.opt_verbose}
@@ -102,4 +105,4 @@ if __name__ == '__main__':
         if args.weights is not None:
             assert sum(args.weights) == k
         for n in args.n:
-            CTSP.run(k=k, n=n, weights=args.weights, strategy=args.strategy.upper(), **options)
+            ctsp.run(k=k, n=n, weights=args.weights, strategy=args.strategy.upper(), **options)

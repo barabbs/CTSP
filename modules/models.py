@@ -29,8 +29,8 @@ def get_models(N, K, W):
         prop_subt = mapped_column(Boolean, nullable=True)
         prop_extr = mapped_column(Boolean, nullable=True)
         prop_canon = mapped_column(Boolean, nullable=True)
-        gap_info = relationship("GAPInfo", back_populates=var.GRAPH_TABLE, lazy="immediate", uselist=False)
-        timings = relationship("Timings", back_populates=var.GRAPH_TABLE, lazy="immediate", uselist=False)
+        gap_info = relationship("GAPInfo", back_populates="graph", lazy="immediate", uselist=False)
+        timings = relationship("Timings", back_populates="graph", lazy="immediate", uselist=False)
 
         def __init__(self, coding, lazy=False, **kwargs):
             # self.n, self.k, self.weights = n, k, weights
@@ -69,7 +69,7 @@ def get_models(N, K, W):
     class Timings(Base):
         __tablename__ = var.TIMINGS_TABLE
         coding = mapped_column(PickleType, ForeignKey(DatabaseGraph.coding), primary_key=True)
-        graph = relationship("DatabaseGraph", back_populates=var.TIMINGS_TABLE, lazy="immediate")
+        graph = relationship("DatabaseGraph", back_populates="timings", lazy="immediate")
         subt_extr = mapped_column(Integer, nullable=True)
         canon = mapped_column(Integer, nullable=True)
         cert = mapped_column(Integer, nullable=True)
@@ -78,7 +78,7 @@ def get_models(N, K, W):
     class GAPInfo(Base):
         __tablename__ = var.GAP_INFO_TABLE
         coding = mapped_column(PickleType, ForeignKey(DatabaseGraph.coding), primary_key=True)
-        graph = relationship("DatabaseGraph", back_populates=var.GAP_INFO_TABLE, lazy="immediate")
+        graph = relationship("DatabaseGraph", back_populates="gap_info", lazy="immediate")
         sol_status = mapped_column(String)
         sol_term_cond = mapped_column(String)
         time_proc = mapped_column(Float)
