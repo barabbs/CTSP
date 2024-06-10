@@ -62,10 +62,12 @@ parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
                     help=f"<parallelization> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)")
 parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
                     help=f"<parallelization> approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)")
-parser.add_argument("--chunks_per_batch", type=int, default=var.CHUNKS_PER_BATCH,
-                    help=f"<parallelization> number of chunks per batch  (default: {var.CHUNKS_PER_BATCH})")
+parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
+                    help=f"<parallelization> maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
                     help=f"<parallelization> min chunks per run  (default: {var.MIN_CHUNKS})")
+parser.add_argument("--batch_chunks", type=int, default=var.BATCH_CHUNKS,
+                    help=f"<parallelization> number of chunks per batch  (default: {var.BATCH_CHUNKS})")
 parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCHES,
                     help=f"<parallelization> batches to preload  (default: {var.PRELOADED_BATCHES})")
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
@@ -94,7 +96,8 @@ if __name__ == '__main__':
     options = {"delete": args.delete,
                "workers": args.workers,
                "chunktime": args.chunktime,
-               "chunks_per_batch": args.chunks_per_batch,
+               "max_chunksize": args.max_chunksize,
+               "batch_chunks": args.batch_size,
                "min_chunks": args.min_chunks,
                "preloaded_batches": args.preloaded_batches,
                "commit_interval": args.commit_interval,

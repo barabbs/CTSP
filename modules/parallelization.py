@@ -75,7 +75,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by=
             return
         chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
 
-        batch_size = chunksize * options["chunks_per_batch"] * options["workers"]
+        batch_size = chunksize * options["batch_chunks"] * options["workers"]
         batches = int(np.ceil(tot / batch_size))
 
         batch_progbar = manager.counter(total=batches, desc=f"Batch ", leave=False)
