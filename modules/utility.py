@@ -1,4 +1,3 @@
-from pyomo.core.expr import identify_variables
 import networkx as nx
 from networkx.algorithms.connectivity import minimum_st_edge_cut
 import pynauty
@@ -11,13 +10,13 @@ RED = '\033[91m'
 ENDCOLOR = '\033[0m'
 
 
-def get_vector_from_variables(variables, all_variables):  # This assumes all coefficients of the variables to be 1!
-    var_set = set(variables)
-    return tuple(v in var_set for v in all_variables)
-
-
-def get_vector_from_constraint(constr, all_variables):  # This assumes all coefficients of the variables to be 1!
-    return get_vector_from_variables((v._index for v in identify_variables(constr.body)), all_variables)
+# def get_vector_from_variables(variables, all_variables):  # This assumes all coefficients of the variables to be 1!
+#     var_set = set(variables)
+#     return tuple(v in var_set for v in all_variables)
+#
+#
+# def get_vector_from_constraint(constr, all_variables):  # This assumes all coefficients of the variables to be 1!
+#     return get_vector_from_variables((v._index for v in identify_variables(constr.body)), all_variables)
 
 
 def get_minimum_cut_edges(graph, n):
