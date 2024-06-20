@@ -2,10 +2,9 @@ import os
 
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
-GRAPH_DATA_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
-GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}-draw")
-DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_s{strategy}.cgdb")
-RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_s{strategy}.json")
+GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
+DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{strategy}{generator}{calculators}.cgdb")
+RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_{strategy}{generator}{calculators}.json")
 RUN_INFO_INDENT = 4
 
 # Table names
@@ -35,7 +34,8 @@ EST_CALC_TIME_PARAMS = {
     "gap": (7e-9, 2.1)
 }
 
-DEFAULT_STRATEGY = "O1"
+DEFAULT_STRATEGY = "A"
+DEFAULT_GENERATOR = "f"
 
 GRAPH_FILENAME = "{coding}.graph"
 GRAPH_FILE_INDENT = None

@@ -4,8 +4,12 @@ import numpy as np
 from modules import var
 import os
 
-
+plt.rcParams["font.family"] = "monospace"
 COLORS = ("#aa1835", "#f79f0e", "#005b96")
+TEXT_COLORS = {True: "xkcd:green",
+               False: "xkcd:red",
+               None: "xkcd:gray",
+               }
 
 BASE_WIDTH, STEP_WIDTH = 2, 0
 
@@ -27,8 +31,9 @@ def edge_style(u, v, i, edges, pos):
             'alpha': 1}
 
 
-def plot_graph(graph, code, properties):
-    plt.figure(figsize=(24, 4))
+def plot_graph(graph, coding, properties=None):
+    properties = properties or dict()
+    plt.figure(figsize=(4, 4))
     try:
         pos = nx.planar_layout(graph)
     except nx.NetworkXException:
@@ -40,13 +45,14 @@ def plot_graph(graph, code, properties):
         nx.draw_networkx_edges(graph, pos=pos, edgelist=(edge,), **edge_style(*edge, graph.edges, pos))
 
     # for i, c in enumerate(self._apply_translation(labels) if labels is not None else self.original_code):
-    for i, c in enumerate(code):
+    for i, c in enumerate(coding):
         plt.annotate(str(c), (0.01, 0.95 - 0.05 * i), xycoords='axes fraction')
-    plt.annotate(f"subt {'Y' if properties['subt'] else 'N'}", (0.99, 0.95), xycoords='axes fraction',
-                 horizontalalignment='right')
-    if properties['extr']:
-        plt.annotate(f"extr {'Y' if properties['extr'] else 'N'}", (0.99, 0.90), xycoords='axes fraction',
+    for i, item in enumerate(properties.items()):
+        name, val = item
+        plt.annotate(f"{name.upper()}", (0.99, 0.95 - 0.05 * i), xycoords='axes fraction', c=TEXT_COLORS[val],
                      horizontalalignment='right')
+    plt.axis('off')
+    plt.tight_layout()
 
 
 def save_graph_drawing(n, k, coding):
@@ -56,3 +62,9 @@ def save_graph_drawing(n, k, coding):
     except FileNotFoundError:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         plt.savefig(fname=path, dpi=var.DRAWINGS_DPI)
+        plt.clf()
+        plt.close('all')
+
+
+def show_graph_drawing():
+    plt.show()

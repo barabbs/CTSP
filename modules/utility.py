@@ -1,5 +1,6 @@
 from pyomo.core.expr import identify_variables
 import networkx as nx
+from networkx.algorithms.connectivity import minimum_st_edge_cut
 import pynauty
 import json, os, time, logging
 from modules import var
@@ -19,40 +20,17 @@ def get_vector_from_constraint(constr, all_variables):  # This assumes all coeff
     return get_vector_from_variables((v._index for v in identify_variables(constr.body)), all_variables)
 
 
-def get_graph_from_code(code):
-    graph = nx.MultiDiGraph()
-    for i, cover in enumerate(code):
-        for k, cycle in cover:
-            # TODO: use nx.add_path(G, [0, 1, 2]) instead?
-            graph.add_edges_from((a, cycle[(b + 1) % k], i) for b, a in enumerate(cycle))
-    return graph
-
-
-def get_nauty_graph(n, k, graph):
-    adj = dict()
-    colors = list(set() for i in range(k - 1))
-    for u, neigh in graph.adjacency():
-        new = list()
-        for v, edges in neigh.items():
-            k = len(edges)
-            if k == 1:
-                new.append(v)
-            else:
-                new.append(n)
-                adj[n] = [v, ]
-                colors[k - 2].add(n)
-                n += 1
-        adj[u] = new
-    # return adj, colors
-    return pynauty.Graph(n, directed=True, adjacency_dict=adj, vertex_coloring=colors)
-
-
-def get_adjacency_matrix(n, k, graph, weights):
-    adj = dict(sum((tuple(((i, j), 0) for j in range(n) if j != i) for i in range(n)), start=tuple()))
-    for u, neigh in graph.adjacency():
-        for v, edges in neigh.items():
-            adj[(u, v)] = len(edges) / k  # TODO: Implement weights
-    return adj
+def get_minimum_cut_edges(graph, n):
+    best_val, best_cut = float("inf"), tuple()
+    for u in graph.nodes:
+        for v in graph.nodes:
+            if u == v:
+                continue
+            new_val, new_cut = nx.minimum_cut(graph, u, v, capacity='weight')
+            print(f"\t\t{new_val}  -  {new_cut}")
+            if new_val < best_val and 2 <= len(new_cut[0]) <= n - 2:
+                best_val, best_cut = new_val, new_cut
+    return best_val, best_cut
 
 
 def convert_raw_gurobi_info(raw):
@@ -75,22 +53,23 @@ def bool_symb(t, file=False):
     return "❌" if file else RED + "■" + ENDCOLOR
 
 
-def save_graph_file(graph, data):
-    path = os.path.join(var.GRAPH_DATA_DIR.format(k=graph.k, n=graph.n),
-                        var.GRAPH_FILENAME.format(coding=graph._coding))
-    try:
-        with open(path, 'w') as f:
-            json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
-    except FileNotFoundError:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
-            json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
+#
+# def save_graph_file(graph, data):
+#     path = os.path.join(var.GRAPH_DATA_DIR.format(k=graph.k, n=graph.n),
+#                         var.GRAPH_FILENAME.format(coding=graph._coding))
+#     try:
+#         with open(path, 'w') as f:
+#             json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
+#     except FileNotFoundError:
+#         os.makedirs(os.path.dirname(path), exist_ok=True)
+#         with open(path, 'w') as f:
+#             json.dump(data, f, indent=var.GRAPH_FILE_INDENT)
 
 
 def save_run_info_file(infos, start_time, time_name, delete=False):
-    filepath = var.RUN_INFO_FILEPATH.format(k=infos['k'], n=infos['n'],
-                                            weights="-".join(str(i) for i in infos['weights']),
-                                            strategy=infos['strategy'])
+    filepath = var.RUN_INFO_FILEPATH.format(
+        k=infos['k'], n=infos['n'], weights="-".join(str(i) for i in infos['weights']),
+        strategy=infos['strategy'], generator=infos['generator'], calculators=infos['calculators'])
     try:
         if delete:
             os.remove(filepath)

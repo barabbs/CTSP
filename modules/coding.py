@@ -3,19 +3,19 @@ import numpy as np
 import modules.utility as utl
 
 
-def canonic_components_permutations(components):
-    if len(components) == 0:
-        yield tuple()
-        return
-    parts = components[0].parts
-    for head in permutations(filter(lambda x: x.parts == parts, components)):
-        for tail in canonic_components_permutations(tuple(filter(lambda x: x.parts != parts, components))):
-            yield *head, *tail
+# def canonic_components_reordering(components):
+#     if len(components) == 0:
+#         yield tuple()
+#         return
+#     parts = components[0].parts
+#     for head in permutations(filter(lambda x: x.parts == parts, components)):
+#         for tail in canonic_components_reordering(tuple(filter(lambda x: x.parts != parts, components))):
+#             yield *head, *tail
 
 
 class Coding(object):
     def __init__(self, covers):
-        self.covers = tuple(covers)
+        self.covers = covers
 
     def __len__(self):
         return len(self.covers)
@@ -30,14 +30,40 @@ class Coding(object):
             return c_1 < c_2
 
     def apply_translation(self, translation):
-        return Coding(cover.apply_translation(translation) for cover in self.covers)
+        return Coding(tuple(cover.apply_translation(translation) for cover in self.covers))
 
-    def code_permutations(self):
-        yield from canonic_components_permutations(self.covers)
+    def code_reordering(self, components=None):
+        components = components if components is not None else self.covers
+        if len(components) == 0:
+            yield tuple()
+            return
+        parts = components[0].parts
+        for head in permutations(filter(lambda x: x.parts == parts, components)):
+            for tail in self.code_reordering(tuple(filter(lambda x: x.parts != parts, components))):
+                yield Coding((*head, *tail))
 
     def is_sorted(self):
         # TODO: Check for sorting between Covers
         return all(c.is_sorted() for c in self.covers)
+
+    def is_canon(self):
+        for reorder in self.code_reordering(self.covers):
+            base_cover = next(iter(reorder))
+            for trans in base_cover.get_translations():
+                if reorder.apply_translation(trans) < self:
+                    return False
+        return True
+
+    def get_translations(self):
+        translations = list()
+        for reorder in self.code_reordering(self.covers):
+            base_cover = next(iter(reorder))
+            for trans in base_cover.get_translations():
+                translations.append(reorder.apply_translation(trans))
+        return translations
+
+    def __invert__(self):
+        return Coding(covers=self.covers[::-1])
 
     def __repr__(self):
         return utl.seqence_to_str((c.parts for c in self.covers)) + " | " + ' - '.join(str(c) for c in self.covers)
@@ -96,3 +122,11 @@ class Cover(object):
 
     def to_save(self):
         return self.cycles
+
+
+if __name__ == '__main__':
+    coding = (((0, 1, 2, 3), (4, 5)), ((0, 2, 3, 5), (1, 4)))  # ((0, 4), (1, 2), (3, 5)))
+    coding = Coding(tuple(Cover(cycles=c) for c in coding))
+    print(coding)
+    print(~coding)
+    print("-" * 32 + "\n" + "\n".join(str(s) for s in coding.get_translations()))

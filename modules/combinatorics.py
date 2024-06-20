@@ -30,7 +30,7 @@ def cycles(nodes, parts, minimum=None):
     return result
 
 
-def graph_codings_generator(n, k=2):
+def full_codings_generator(n, k=2):
     if not k == 2:
         raise NotImplemented
     nodes = tuple(range(n))
@@ -43,6 +43,14 @@ def graph_codings_generator(n, k=2):
     partition.cache_clear()
     cycles.cache_clear()
 
+
+CODINGS_GENERATORS = {
+    'f': {
+        'name': "FULL",
+        'descr': "generates all possible graph codings",
+        'func': full_codings_generator
+    },
+}
 
 """
  4  0.00010013580322265625

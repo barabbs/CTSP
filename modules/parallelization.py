@@ -1,8 +1,6 @@
-import gc
-
 from modules.models import get_models, GRAPH, TIMINGS, GAP_INFO
-from modules.graph import Graph, CANON, SUBT_EXTR, CERTIFICATE, GAP
-from modules.combinatorics import graph_codings_generator
+from modules.graph import Graph
+from modules.combinatorics import full_codings_generator
 from modules import var
 from modules import utility as utl
 
@@ -44,13 +42,14 @@ def _commit_cached(session, models, cache, codings, start, manager):
     return end
 
 
-def _calc_helper(calc_type, n, k, weights, coding):
+def _calc_helper(calculator, n, k, weights, coding):
     # logging.stage(f"            {os.getpid():>8}({os.getpid() - os.getppid():<4})  {num:>8}  {calc_type.upper():<10} {coding}")
     graph = Graph(n=n, k=k, weights=weights, coding=coding)
-    calc = graph.calculate(calc_type)
-    del graph
-    gc.collect()
-    return calc
+    return calculator.calc(graph)
+    # calc = graph.calculate(calc_type)
+    # del graph
+    # gc.collect()
+    # return calc
 
 
 def _launch_batch(batch, batch_size, codings, mapper, executor, calc_func, chunksize, batch_progbar):
@@ -62,7 +61,7 @@ def _launch_batch(batch, batch_size, codings, mapper, executor, calc_func, chunk
     return chain(mapper, new_mapper)
 
 
-def parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by=None,
+def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=None, group_by=None,
                  **options):  # TODO: Sistemare questo schifo immondo.
     manager = enlighten.get_manager()
     with Session(engine) as session:
@@ -86,11 +85,14 @@ def parallel_run(engine, models, n, k, weights, calc_type, where=None, group_by=
         statement = select(models[GRAPH].coding).where(*where_smnt).group_by(group_by_smnt)
         # codings_gen = session.scalars(statement).partitions(size=batch_size)
         codings = session.scalars(statement).all()
-        calc_func = partial(_calc_helper, calc_type, n, k, weights)
+        calculator = calculators.get_calculation(calc_type, n=n, k=k, weight=weights, **options)
+        calc_func = partial(_calc_helper, calculator, n, k, weights)
 
         next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
         mapper = tuple()
-        with ProcessPoolExecutor(max_workers=options["workers"], initializer=os.nice, initargs=(var.PROCESSES_NICENESS,)
+        with ProcessPoolExecutor(max_workers=options["workers"],
+                                 initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
+                                 max_tasks_per_child=chunksize * options["batch_chunks"],
                                  ) as executor:
             for pre_batch in range(options["preloaded_batches"]):
                 mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, calc_func, chunksize,

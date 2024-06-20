@@ -1,5 +1,7 @@
 from modules import ctsp
 from modules import var
+from modules.combinatorics import CODINGS_GENERATORS
+from modules.calculations import CANON, CERTIFICATE, SUBT_EXTR, GAP, CALCULATIONS
 import argparse
 
 import sys
@@ -22,7 +24,6 @@ logging.Logger.result = partialmethod(logging.Logger.log, logging.RESULT)
 logging.result = partial(logging.log, logging.RESULT)
 
 
-
 def init_logging(level):
     logging.basicConfig(
         level=level,
@@ -36,11 +37,11 @@ def init_logging(level):
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
 parser.add_argument("-n", type=int, nargs="+",
-                    help="number of nodes n in graph  (sequence separated by whitespace)", required=True)
+                    help="number of nodes n in graph  (sequence separated by whitespace)\n\n", required=True)
 parser.add_argument("-k", type=int, nargs="+", default=(2,),
-                    help="number of covers k in graph (sequence separated by whitespace)")
+                    help="number of covers k in graph (sequence separated by whitespace)\n\n")
 parser.add_argument("-w", "--weights", type=int, default=None,
-                    help="weights of covers in graph (sequence separated by whitespace)")
+                    help="weights of covers in graph (sequence separated by whitespace)\n\n")
 STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in ctsp.STRATEGIES.items())
 STRATEGIES_TABLE = f"""
 
@@ -52,32 +53,50 @@ STRATEGIES_TABLE = f"""
 """
 parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
                     help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY})" + STRATEGIES_TABLE)
+
+GENERATORS_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CODINGS_GENERATORS.items())
+GENERATORS_TABLE = f"""
+
+    |    name    |            description
+----|------------|{'-' * 35}
+{GENERATORS_ROWS}
+    |            |
+
+"""
+parser.add_argument("-g", "--generator", type=str, default=var.DEFAULT_GENERATOR,
+                    help=f"selected generator for computation, from the following (default: {var.DEFAULT_GENERATOR})" + STRATEGIES_TABLE)
+
+for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP):
+    CALC_ROWS = '\n'.join(f"{i:>4}. {c.CALC_NAME}" for i, c in enumerate(CALCULATIONS[calc_type]))
+    parser.add_argument(f"--{calc_type}", type=int, default=0,
+                        help=f"selected calculation for {calc_type.upper()}, among the following (default: 0)\n" + CALC_ROWS + "\n\n")
+
 parser.add_argument("-d", "--delete", action="store_true",
-                    help="delete and re-initialize databases")
+                    help="delete and re-initialize databases\n\n")
 parser.add_argument("-v", "--verbose", action='count', default=0,
-                    help="increase output verbosity")
+                    help="increase output verbosity\n\n")
 parser.add_argument("-q", "--quiet", action='count', default=0,
-                    help="decrease output verbosity")
+                    help="decrease output verbosity\n\n")
 parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
-                    help=f"<parallelization> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)")
+                    help=f"<PARALL> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)\n\n")
 parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
-                    help=f"<parallelization> approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)")
+                    help=f"<PARALL> approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)\n\n")
 parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
-                    help=f"<parallelization> maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})")
+                    help=f"<PARALL> maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})\n\n")
 parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
-                    help=f"<parallelization> min chunks per run  (default: {var.MIN_CHUNKS})")
+                    help=f"<PARALL> min chunks per run  (default: {var.MIN_CHUNKS})\n\n")
 parser.add_argument("--batch_chunks", type=int, default=var.BATCH_CHUNKS,
-                    help=f"<parallelization> number of chunks per batch  (default: {var.BATCH_CHUNKS})")
+                    help=f"<PARALL> number of chunks per batch  (default: {var.BATCH_CHUNKS})\n\n")
 parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCHES,
-                    help=f"<parallelization> batches to preload  (default: {var.PRELOADED_BATCHES})")
+                    help=f"<PARALL> batches to preload  (default: {var.PRELOADED_BATCHES})\n\n")
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
-                    help=f"seconds between commits to database  (default: {var.COMMIT_INTERVAL}s)")
+                    help=f"seconds between commits to database  (default: {var.COMMIT_INTERVAL}s)\n\n")
 parser.add_argument("--sql_verbose", action="store_true",
-                    help="verbosity of SqlAlchemy backend")
-parser.add_argument("--opt_verbose", action="store_true",
-                    help="verbosity of integrality gap optimizer")
+                    help="verbosity of SqlAlchemy backend\n\n")
+parser.add_argument("--gurobi_verbose", action="store_true",
+                    help="verbosity of integrality gap optimizer gurobi\n\n")
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -102,10 +121,16 @@ if __name__ == '__main__':
                "preloaded_batches": args.preloaded_batches,
                "commit_interval": args.commit_interval,
                "sql_verbose": args.sql_verbose,
-               "opt_verbose": args.opt_verbose}
+               "gurobi_verbose": args.gurobi_verbose}
+
+    calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
 
     for k in args.k:
         if args.weights is not None:
             assert sum(args.weights) == k
         for n in args.n:
-            ctsp.run(k=k, n=n, weights=args.weights, strategy=args.strategy.upper(), **options)
+            ctsp.run(
+                k=k, n=n, weights=args.weights,
+                strategy=args.strategy.upper(), generator=args.generator.lower(), calcs_indices=calcs_indices,
+                **options
+            )
