@@ -128,6 +128,7 @@ def run(n, k, weights, strategy, generator, calcs_indices, **options):
              "calculators": str(calculators),
              "options": options}
     options_descr = '\n    '.join(f"{i + ':':<23} {v}" for i, v in options.items())
+    calcs_descr = '\n    '.join(f'{calc_type.upper():<12}{calc.CALC_NAME}' for calc_type, calc in calculators.calcs_classes.items())
     logging.info(f"""
     
 {'-' * 128}
@@ -136,7 +137,7 @@ PARAMS         n={n}, k={k}, w={weights}
 STRATEGY       {strategy} - {STRATEGIES[strategy]['name']:<12}  [{STRATEGIES[strategy]['descr']}]
 GENERATION     {generator} - {CODINGS_GENERATORS[generator]['name']:<12}  [{CODINGS_GENERATORS[generator]['descr']}]
 CALCULATORS    {calculators}
-    {'\n    '.join(f'{calc_type.upper():<12}{calc.CALC_NAME}' for calc_type, calc in calculators.calcs_classes.items())}
+    {calcs_descr}
 
 OPTIONS
     {options_descr}
