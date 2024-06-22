@@ -13,9 +13,7 @@ CALCULATIONS = {CANON: canon.CALCULATIONS_LIST,
 
 
 def _get_name(canon_ind, subt_extr_ind):
-    if canon_ind == 0 and subt_extr_ind == 0:
-        return str()
-    return f"{canon_ind}{subt_extr_ind}"
+    return f"{canon_ind*8 + subt_extr_ind:x}"
 
 
 class Calculators(object):

@@ -52,6 +52,50 @@ def bool_symb(t, file=False):
     return "❌" if file else RED + "■" + ENDCOLOR
 
 
+SEPARATOR = " "
+CHARACTERS = {0.: "0", .5: "½", 1.: "1",
+              (0, 0): "A", (0, 1): "a",
+              (1, 0): "B", (1, 1): "b",
+              (2, 0): "C", (2, 1): "c",
+              None: "-"}
+
+
+def prettyprint_graph_adj(n, adj, labels=None, line_start="\t"):
+    if labels is None:
+        labels = (list(range(n)), list(range(n)))
+    # remove = False
+    print(line_start + f"╲ j{SEPARATOR}" + SEPARATOR.join(str(labels[1][j]) for j in range(n)))
+    print(line_start + "i ┌" + "─" * ((len(SEPARATOR) + 1) * n))
+    for i in range(n):
+        print(line_start + f"{labels[0][i]} │", end=SEPARATOR)
+        for j in range(n):
+            if i == j:
+                print(" ", end=SEPARATOR)
+            else:
+                val = adj.get((labels[0][i], labels[1][j]), None)
+                # if val == 1:
+                #     remove = True
+                print(CHARACTERS[val], end=SEPARATOR)
+        print()
+    # if remove:
+    #     transl = dict()
+    #     for k, v in adj.items():
+    #         if v == 1:
+    #             print(labels)
+    #             print(k)
+    #             labels[0].remove(k[0])
+    #             # labels[0].remove(k[1])
+    #             # labels[0][k[0]] = k[1]
+    #             labels[1].remove(transl.get(k[0], k[0]))
+    #             labels[1][labels[1].index(k[1])] = k[0]
+    #             n -= 1
+    #             break
+    #             transl[k[1]] = k[0]
+    #     print(labels)
+    #     print(f"\n{line_start}---- without 1s ----")
+    #     prettyprint_graph_adj(n, adj, labels, line_start)
+
+
 #
 # def save_graph_file(graph, data):
 #     path = os.path.join(var.GRAPH_DATA_DIR.format(k=graph.k, n=graph.n),
