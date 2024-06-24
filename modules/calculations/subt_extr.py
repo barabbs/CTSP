@@ -128,6 +128,86 @@ class EXTR_Matrix(SUBTEXTR_Base):
 #             return True
 #         return super()._extr_calc(graph, active_vects)
 
+# def pprint_ant(ants, gr, start="\t"):
+#     if gr is None:
+#         print(f"{start}        [{', '.join(str(s) for s in ants)}]")
+#         return
+#     print(f"{start}{gr}  [{', '.join(str(s) for s in ants[gr])}]")
+#
+#
+# def add_antagonists_print(antagonists, exhausted, *groups):
+#     if groups[0] == groups[1]:
+#         # add_exhaust = groups[0]
+#         iterator = (groups,)
+#         # antagonists[gr].update(*(antagonists[gr] for gr in antagonists[gr])
+#         # for g in antagonists[gr]:
+#         #     antagonists[g] = antagonists[gr]
+#     else:
+#         exh_gr = set(groups).intersection(exhausted)
+#         if len(exh_gr) > 0:
+#             print(f"\n----  EXHAUST CASE  ----")
+#             exh_gr, act_gr = exh_gr.pop(), set(groups).difference(exhausted).pop()
+#             pprint_ant(antagonists, exh_gr, start="EXH ")
+#             pprint_ant(antagonists, act_gr, start="ACT ")
+#             # for gr in antagonists[act_gr]:
+#             #     antagonists[exh_gr].update(antagonists[gr])
+#             #     break
+#             antagonists[act_gr].add(act_gr)
+#             # add_exhaust = act_gr
+#             pprint_ant(antagonists, act_gr, start="--> ")
+#             iterator = ((exh_gr, act_gr),)
+#         else:
+#             # add_exhaust = None
+#             iterator = (groups, groups[::-1])
+#     for A, B in iterator:
+#         print(f"\n----  A {A}\tB {B}  ----")
+#         pprint_ant(antagonists, A, start="  A ")
+#         pprint_ant(antagonists, B, start="  B ")
+#         for gr in antagonists[B]:
+#             pprint_ant(antagonists, gr)
+#         #     antagonists[A].update(antagonists[gr])
+#         #     break
+#         antagonists[A].update(*(antagonists[gr] for gr in antagonists[B]))
+#         pprint_ant(antagonists, A, start="NEW ")
+#
+#     print(f"\n--------  UPDATE  --------")
+#     for A, B in iterator:
+#         pprint_ant(antagonists, B, start="FRM ")
+#         new_ants = antagonists[A]
+#         for gr in antagonists[B]:
+#             pprint_ant(antagonists, gr)
+#             antagonists[gr] = new_ants
+#         pprint_ant(antagonists, A, start=" TO ")
+#         if A in new_ants:
+#             exhausted.update(new_ants)
+#     # if add_exhaust is not None:
+#     #     add_exhausted(antagonists, exhausted, add_exhaust)
+
+
+def add_exhausted(antagonists, exhausted, group):
+    exhausted.update({group, }, antagonists[group])
+
+
+def add_antagonists(antagonists, exhausted, *groups):
+    if groups[0] == groups[1]:
+        iterator = (groups,)
+    else:
+        exh_gr = set(groups).intersection(exhausted)
+        if len(exh_gr) > 0:
+            exh_gr, act_gr = exh_gr.pop(), set(groups).difference(exhausted).pop()
+            antagonists[act_gr].add(act_gr)
+            iterator = ((exh_gr, act_gr),)
+        else:
+            iterator = (groups, groups[::-1])
+    for A, B in iterator:
+        antagonists[A].update(*(antagonists[gr] for gr in antagonists[B]))
+    for A, B in iterator:
+        new_ants = antagonists[A]
+        for gr in antagonists[B]:
+            antagonists[gr] = new_ants
+        if A in new_ants:
+            exhausted.update(new_ants)
+
 
 class EXTR_Chain(SUBTEXTR_Base):
     EXTR_CALC_NAME = "Chain"
@@ -165,7 +245,8 @@ class EXTR_Chain(SUBTEXTR_Base):
     def _extr_calc(self, graph, active_vects):
         graph_vect = graph.vector
         groups, counter = self.get_groups(graph_vect)
-        antagonists = set(((g, 0), (g, 1)) for g in range(counter))
+        antagonists = dict(((gr, ind), {(gr, ind ^ 1), }) for gr in range(counter) for ind in (0, 1))
+        exhausted = set()
         # print(f"\t\tgroup {group}")
         # i, j = 0, 0
         for vect in active_vects:
@@ -175,14 +256,13 @@ class EXTR_Chain(SUBTEXTR_Base):
             except ValueError:
                 # i += 1
                 continue
-            edges_group = (groups[tuple(edge_1)], groups[tuple(edge_2)])
-            if not (edges_group in antagonists or edges_group[::-1] in antagonists):
+            group_1, group_2 = groups[tuple(edge_1)], groups[tuple(edge_2)]
+            if group_2 not in antagonists[group_1] and (group_1 not in exhausted or group_2 not in exhausted):
                 counter -= 1
                 if counter == 0:
                     # return i, j
                     return True
-                antagonists.add(edges_group)
-                antagonists.add(tuple((gr, ind ^ 1) for gr, ind in edges_group))
+                add_antagonists(antagonists, exhausted, group_1, group_2)
         # return i, j
         return False
 
