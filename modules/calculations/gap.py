@@ -31,7 +31,7 @@ class GAP_Gurobi(Calculation):
         return self.c[(u, v)] - self.y[(u, 0)] - self.y[(v, 1)] - sum(self.d[S] for S in S_x)
 
     def _init_model(self):
-        print(f"Initializig gurobi model in process {os.getpid() - os.getppid():<4}")
+        # print(f"Initializig gurobi model in process {os.getpid() - os.getppid():<4}")
         self.env = gp.Env(params={"OutputFlag": int(self.verbose)})
         self.model = gp.Model(env=self.env)
 
@@ -61,7 +61,7 @@ class GAP_Gurobi(Calculation):
 
     def _calc(self, graph):
         model = self.model
-        print(f"    {os.getpid() - os.getppid():<4}")
+        # print(f"    {os.getpid() - os.getppid():<4}")
 
         if self.reset:
             model.reset()

@@ -35,7 +35,7 @@ EST_CALC_TIME_PARAMS = {
     "gap": (7e-9, 2.1)
 }
 
-DEFAULT_STRATEGY = "A"
+DEFAULT_STRATEGY = "1"
 DEFAULT_GENERATOR = "f"
 
 GRAPH_FILENAME = "{coding}.graph"
