@@ -88,7 +88,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
         calculator = calculators.get_calculation(calc_type, n=n, k=k, weight=weights, **options)
         calc_func = partial(_calc_helper, calculator, n, k, weights)
 
-        next_commit, cache, committed = time.time() + options["commit_interval"], list(), 0
+        next_commit, commit_counter, cache, committed = time.time() + options["commit_interval"], 0, list(), 0
         mapper = tuple()
         with ProcessPoolExecutor(max_workers=options["workers"],
                                  initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
@@ -105,12 +105,13 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
                         cache.append(next(mapper))
                     except StopIteration:
                         break
+                    commit_counter += 1
                     result_progbar.update()
-                    if time.time() > next_commit:
+                    if time.time() > next_commit or commit_counter >= options["max_commit_cache"]:
                         committed = _commit_cached(session=session, models=models,
                                                    cache=cache, codings=codings,
                                                    start=committed, manager=manager)
-                        next_commit, cache = time.time() + options["commit_interval"], list()
+                        next_commit, commit_counter, cache = time.time() + options["commit_interval"], 0, list()
             _commit_cached(session=session, models=models,
                            cache=cache, codings=codings,
                            start=committed, manager=manager)

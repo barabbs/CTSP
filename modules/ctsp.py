@@ -57,7 +57,7 @@ STRATEGIES = {
                    'group_by': 'certificate'}),
         )
     },
-    "A": {
+    "1": {
         'name': "optimal_1",
         'descr': "CERT > SUB_EXT > GAP",
         'sequence': (
@@ -70,7 +70,7 @@ STRATEGIES = {
                    'group_by': 'certificate'}),
         )
     },
-    "B": {
+    "2": {
         'name': "optimal_2",
         'descr': "CANON > CERT > SUB_EXT > GAP",
         'sequence': (
@@ -80,6 +80,24 @@ STRATEGIES = {
             (SUBT_EXTR, {'where': {'prop_subt': None,
                                    'prop_canon': True},
                          'group_by': 'certificate'}),
+            (GAP, {'where': {'prop_canon': True,
+                             'prop_subt': True,
+                             'prop_extr': True,
+                             'gap': None},
+                   'group_by': 'certificate'}),
+        )
+    },
+    "3": {  # CANON	SEP+EXTR	CERT
+        'name': "optimal_3",
+        'descr': "CANON > SUB_EXT > CERT > GAP",
+        'sequence': (
+            (CANON, {'where': {'prop_canon': None}}),
+            (SUBT_EXTR, {'where': {'prop_subt': None,
+                                   'prop_canon': True}}),
+            (CERTIFICATE, {'where': {'certificate': None,
+                                     'prop_canon': True,
+                                     'prop_subt': True,
+                                     'prop_extr': True, }}),
             (GAP, {'where': {'prop_canon': True,
                              'prop_subt': True,
                              'prop_extr': True,
@@ -128,7 +146,8 @@ def run(n, k, weights, strategy, generator, calcs_indices, **options):
              "calculators": str(calculators),
              "options": options}
     options_descr = '\n    '.join(f"{i + ':':<23} {v}" for i, v in options.items())
-    calcs_descr = '\n    '.join(f'{calc_type.upper():<12}{calc.CALC_NAME}' for calc_type, calc in calculators.calcs_classes.items())
+    calcs_descr = '\n    '.join(
+        f'{calc_type.upper():<12}{calc.CALC_NAME}' for calc_type, calc in calculators.calcs_classes.items())
     logging.info(f"""
     
 {'-' * 128}

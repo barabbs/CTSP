@@ -93,6 +93,8 @@ parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCH
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
                     help=f"seconds between commits to database  (default: {var.COMMIT_INTERVAL}s)\n\n")
+parser.add_argument("--max_commit_cache", type=int, default=var.MAX_COMMIT_CACHE,
+                    help=f"maximum commit cache size before committing to database  (default: {var.MAX_COMMIT_CACHE})\n\n")
 parser.add_argument("--sql_verbose", action="store_true",
                     help="verbosity of SqlAlchemy backend\n\n")
 parser.add_argument("--gurobi_verbose", action="store_true",
@@ -120,6 +122,7 @@ if __name__ == '__main__':
                "min_chunks": args.min_chunks,
                "preloaded_batches": args.preloaded_batches,
                "commit_interval": args.commit_interval,
+               "max_commit_cache": args.max_commit_cache,
                "sql_verbose": args.sql_verbose,
                "gurobi_verbose": args.gurobi_verbose}
 

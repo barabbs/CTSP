@@ -21,6 +21,7 @@ CALC_GAP = 'gap'
 CPU_COUNT = os.cpu_count()
 CHUNKTIME = 1
 COMMIT_INTERVAL = 60
+MAX_COMMIT_CACHE = 10000
 MAX_CHUNKSIZE = 1000
 MIN_CHUNKS = 10
 BATCH_CHUNKS = 100
@@ -28,9 +29,9 @@ BATCH_CHUNKS = 100
 PRELOADED_BATCHES = 1
 PROCESSES_NICENESS = 1
 EST_CALC_TIME_PARAMS = {
-    "subt_extr": (1e-06, 0.95),
-    "canon": (1e-04, 0),
-    "cert": (1.4e-04, -0.42),
+    "subt_extr": (3.2e-04, -0.0617),
+    "canon": (6.23e-04, -0.129),
+    "cert": (1.93e-04, -0.0884),
     "gap": (7e-9, 2.1)
 }
 
