@@ -52,6 +52,8 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
         for i, graph in enumerate(graphs):
             if n_best is not None and i == n_best:
                 break
+            if only_gap:
+                print(f"\t{str(graph):<64}    gap: {graph.gap:.5f}")
             graph.draw()
             progbar.update()
     progbar.close()
