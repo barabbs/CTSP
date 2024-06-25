@@ -66,9 +66,19 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
     manager = enlighten.get_manager()
     with Session(engine) as session:
         where_smnt = tuple(getattr(models[GRAPH], attr).is_(val) for attr, val in where.items())
-        group_by_smnt = None if group_by is None else getattr(models[GRAPH], group_by)
 
-        tot = session.query(models[GRAPH]).where(*where_smnt).group_by(group_by_smnt).count()
+        if group_by is None:
+            tot = session.query(models[GRAPH]).where(*where_smnt).count()
+        else:
+            graph_alias = aliased(models[GRAPH], name="graph_max")
+            statement = select(models[GRAPH].coding).join(
+                graph_alias,
+                and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
+                     models[GRAPH].coding > graph_alias.coding),
+                isouter=True
+            ).where(graph_alias.coding.is_(None), *where_smnt)
+            tot = statement.count()
+
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return
