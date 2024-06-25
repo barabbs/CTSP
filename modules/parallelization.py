@@ -5,6 +5,7 @@ from modules import var
 from modules import utility as utl
 
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from itertools import chain
 import os, logging
@@ -80,7 +81,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
 
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
-            return
+            return True
         chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
 
         batch_size = chunksize * options["batch_chunks"] * options["workers"]
@@ -124,6 +125,14 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
                         cache.append(next(mapper))
                     except StopIteration:
                         break
+                    except BrokenProcessPool:
+                        logging.warning(f"    (batch: {batch}, num: {i})  A process in the process pool was terminated abruptly, trying to restart...")
+                        _commit_cached(session=session, models=models,
+                                       cache=cache, codings=codings,
+                                       start=committed, manager=manager)
+                        batch_progbar.close()
+                        result_progbar.close()
+                        return False
                     commit_counter += 1
                     result_progbar.update()
                     if time.time() > next_commit or commit_counter >= options["max_commit_cache"]:
@@ -137,3 +146,4 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
     batch_progbar.close()
     result_progbar.close()
     manager.stop()
+    return True

@@ -174,7 +174,10 @@ OPTIONS
         logging.info(
             f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
         start_time = time.time()
-        parallel_run(engine=engine, models=models,
-                     n=n, k=k, weights=weights,
-                     calc_type=calc_type, calculators=calculators, **statements, **options)
+        while True:
+            result = parallel_run(engine=engine, models=models,
+                                  n=n, k=k, weights=weights,
+                                  calc_type=calc_type, calculators=calculators, **statements, **options)
+            if result is not False:
+                break
         utl.save_run_info_file(infos, start_time=start_time, time_name=calc_type)
