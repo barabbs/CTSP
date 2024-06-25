@@ -31,10 +31,12 @@ for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP):
     CALC_ROWS = '\n'.join(f"{i:>4}. {c.CALC_NAME}" for i, c in enumerate(CALCULATIONS[calc_type]))
     parser.add_argument(f"--{calc_type}", type=int, default=0,
                         help=f"selected calculation for {calc_type.upper()}, among the following (default: 0)\n" + CALC_ROWS + "\n\n")
+parser.add_argument("--no_draw", action="store_true",
+                    help="dry run without drawing\n\n")
 
 
 def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_best=None,
-        generator=var.DEFAULT_GENERATOR, calculators=None):
+        generator=var.DEFAULT_GENERATOR, calculators=None, no_draw=False):
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
@@ -54,7 +56,8 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
                 break
             if only_gap:
                 print(f"{i:>6}. {str(graph)[9:]:<64}    gap: {graph.gap:.5f}")
-            graph.draw()
+            if not no_draw:
+                graph.draw()
             progbar.update()
     progbar.close()
     manager.stop()
@@ -76,4 +79,4 @@ if __name__ == '__main__':
                     continue
             run(n=n, k=k, weights=args.weights,
                 strategy=args.strategy.upper(), generator=args.generator.lower(), calculators=calculators,
-                only_gap=gap, n_best=args.best)
+                only_gap=gap, n_best=args.best, no_draw=args.no_draw)
