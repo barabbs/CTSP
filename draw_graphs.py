@@ -46,6 +46,8 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
         if only_gap:
             statement = statement.where(models[GRAPH].gap.is_not(None)).order_by(models[GRAPH].gap.desc())
         graphs = session.scalars(statement).all()
+        tot = n_best or len(graphs)
+        print(f"Drawing {tot} graphs...")
         progbar = manager.counter(total=n_best or len(graphs), desc=f"Drawing", leave=False)
         for i, graph in enumerate(graphs):
             if n_best is not None and i == n_best:

@@ -10,6 +10,7 @@ TEXT_COLORS = {True: "xkcd:green",
                False: "xkcd:red",
                None: "xkcd:gray",
                }
+GAP_COLOR = "xkcd:black"
 
 BASE_WIDTH, STEP_WIDTH = 2, 0
 
@@ -31,7 +32,7 @@ def edge_style(u, v, i, edges, pos):
             'alpha': 1}
 
 
-def plot_graph(graph, coding, properties=None):
+def plot_graph(graph, coding, properties=None, gap=None):
     properties = properties or dict()
     plt.figure(figsize=(4, 4))
     try:
@@ -47,9 +48,15 @@ def plot_graph(graph, coding, properties=None):
     # for i, c in enumerate(self._apply_translation(labels) if labels is not None else self.original_code):
     for i, c in enumerate(coding):
         plt.annotate(str(c), (0.01, 0.95 - 0.05 * i), xycoords='axes fraction')
+    if gap is None:
+        plt.annotate(f"---", (0.99, 0.95), xycoords='axes fraction', c=TEXT_COLORS[None],
+                     horizontalalignment='right')
+    else:
+        plt.annotate(f"{gap:.3f}", (0.99, 0.95), xycoords='axes fraction', c=GAP_COLOR,
+                     horizontalalignment='right')
     for i, item in enumerate(properties.items()):
         name, val = item
-        plt.annotate(f"{name.upper()}", (0.99, 0.95 - 0.05 * i), xycoords='axes fraction', c=TEXT_COLORS[val],
+        plt.annotate(f"{name.upper()}", (0.99, 0.90 - 0.05 * i), xycoords='axes fraction', c=TEXT_COLORS[val],
                      horizontalalignment='right')
     plt.axis('off')
     plt.tight_layout()

@@ -63,12 +63,14 @@ def get_models(N, K, W):
         def draw(self):
             self._graph.draw(properties={'subt': self.prop_subt,
                                          'extr': self.prop_extr,
-                                         'canon': self.prop_canon})
+                                         'canon': self.prop_canon},
+                             gap=self.gap)
 
         def show(self):
             self._graph.show(properties={'subt': self.prop_subt,
                                          'extr': self.prop_extr,
-                                         'canon': self.prop_canon})
+                                         'canon': self.prop_canon},
+                             gap=self.gap)
 
         def __repr__(self):
             return f"Database {self._graph}"

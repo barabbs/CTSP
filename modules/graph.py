@@ -75,12 +75,12 @@ class Graph(object):
 
     # GRAPHICS and FILES
 
-    def draw(self, properties=None):
-        graphics.plot_graph(self.graph, self.coding, properties)
+    def draw(self, properties=None, gap=None):
+        graphics.plot_graph(self.graph, self.coding, properties, gap)
         graphics.save_graph_drawing(n=self.n, k=self.k, coding=self.coding)
 
-    def show(self, properties=None):
-        graphics.plot_graph(self.graph, self.coding, properties)
+    def show(self, properties=None, gap=None):
+        graphics.plot_graph(self.graph, self.coding, properties, gap)
         graphics.show_graph_drawing()
 
     def __repr__(self):
