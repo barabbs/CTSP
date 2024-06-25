@@ -64,7 +64,7 @@ GENERATORS_TABLE = f"""
 
 """
 parser.add_argument("-g", "--generator", type=str, default=var.DEFAULT_GENERATOR,
-                    help=f"selected generator for computation, from the following (default: {var.DEFAULT_GENERATOR})" + STRATEGIES_TABLE)
+                    help=f"selected generator for computation, from the following (default: {var.DEFAULT_GENERATOR})" + GENERATORS_TABLE)
 
 for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP):
     CALC_ROWS = '\n'.join(f"{i:>4}. {c.CALC_NAME}" for i, c in enumerate(CALCULATIONS[calc_type]))
