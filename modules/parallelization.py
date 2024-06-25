@@ -71,13 +71,12 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
             tot = session.query(models[GRAPH]).where(*where_smnt).count()
         else:
             graph_alias = aliased(models[GRAPH], name="graph_max")
-            statement = select(models[GRAPH].coding).join(
+            tot = session.query(models[GRAPH]).join(
                 graph_alias,
                 and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
                      models[GRAPH].coding > graph_alias.coding),
                 isouter=True
-            ).where(graph_alias.coding.is_(None), *where_smnt)
-            tot = statement.count()
+            ).where(graph_alias.coding.is_(None), *where_smnt).count()
 
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
