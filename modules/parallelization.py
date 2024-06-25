@@ -11,8 +11,8 @@ import os, logging
 import time
 import numpy as np
 
-from sqlalchemy import create_engine, select, insert, update, bindparam
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, select, insert, update, bindparam, and_
+from sqlalchemy.orm import Session, aliased
 import enlighten
 
 COMMIT_UPDATE = lambda c: update(c).where(c.coding == bindparam("id"))
@@ -82,7 +82,17 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
 
         logging.trace(f"    Total {tot:>8}    (chunksize {chunksize} / {batches} batches of {batch_size})")
 
-        statement = select(models[GRAPH].coding).where(*where_smnt).group_by(group_by_smnt)
+        if group_by is None:
+            statement = select(models[GRAPH].coding).where(
+                *where_smnt)  # .group_by(group_by_smnt)  # .order_by(None if group_by is None else models[GRAPH].coding)
+        else:
+            graph_alias = aliased(models[GRAPH], name="graph_max")
+            statement = select(models[GRAPH].coding).join(
+                graph_alias,
+                and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
+                     models[GRAPH].coding > graph_alias.coding),
+                isouter=True
+            ).where(graph_alias.coding.is_(None), *where_smnt)
         # codings_gen = session.scalars(statement).partitions(size=batch_size)
         codings = session.scalars(statement).all()
         calculator = calculators.get_calculation(calc_type, n=n, k=k, weight=weights, **options)
