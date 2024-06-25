@@ -22,7 +22,7 @@ class CANON_Direct(CANON_Base):
 
 
 class CANON_Smart(CANON_Base):
-    CALC_NAME = "Smart"
+    CALC_NAME = "Smart (k = 2)"
 
     def __init__(self, k, **kwargs):
         self.k = k
@@ -46,6 +46,6 @@ class CANON_Quick(CANON_Smart):
         raise NotImplemented
 
 
-CALCULATIONS_LIST = (CANON_Smart,
-                     CANON_Direct,
+CALCULATIONS_LIST = (CANON_Direct,
+                     CANON_Smart,
                      CANON_Quick)

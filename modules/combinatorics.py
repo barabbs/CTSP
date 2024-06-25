@@ -46,7 +46,7 @@ def full_codings_generator(n, k=2):
 
 CODINGS_GENERATORS = {
     'f': {
-        'name': "FULL",
+        'name': "full",
         'descr': "generates all possible graph codings",
         'func': full_codings_generator
     },
