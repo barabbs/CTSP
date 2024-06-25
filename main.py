@@ -42,25 +42,25 @@ parser.add_argument("-k", type=int, nargs="+", default=(2,),
                     help="number of covers k in graph (sequence separated by whitespace)\n\n")
 parser.add_argument("-w", "--weights", type=int, default=None,
                     help="weights of covers in graph (sequence separated by whitespace)\n\n")
-STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in ctsp.STRATEGIES.items())
+STRATEGIES_ROWS = '\n'.join(f" {k:<3}| {v['name']:<12} | {v['descr']}" for k, v in ctsp.STRATEGIES.items())
 STRATEGIES_TABLE = f"""
 
-    |    name    |            description
-----|------------|{'-' * 35}
+    |     name     |            description
+----|--------------|{'-' * 35}
 {STRATEGIES_ROWS}
-    |            |
+    |              |
     
 """
 parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
                     help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY})" + STRATEGIES_TABLE)
 
-GENERATORS_ROWS = '\n'.join(f" {k:<3}| {v['name']:<10} | {v['descr']}" for k, v in CODINGS_GENERATORS.items())
+GENERATORS_ROWS = '\n'.join(f" {k:<3}| {v['name']:<12} | {v['descr']}" for k, v in CODINGS_GENERATORS.items())
 GENERATORS_TABLE = f"""
 
-    |    name    |            description
-----|------------|{'-' * 35}
+    |     name     |            description
+----|--------------|{'-' * 35}
 {GENERATORS_ROWS}
-    |            |
+    |              |
 
 """
 parser.add_argument("-g", "--generator", type=str, default=var.DEFAULT_GENERATOR,
