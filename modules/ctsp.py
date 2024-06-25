@@ -23,21 +23,21 @@ STRATEGIES = {
         )
     },
     "K": {
-        'name': "properties",
+        'name': "canon",
         'descr': "CANON",
         'sequence': (
             (CANON, {'where': {'prop_canon': None}}),
         )
     },
     "C": {
-        'name': "properties",
+        'name': "certificate",
         'descr': "CERT",
         'sequence': (
             (CERTIFICATE, {'where': {'certificate': None}}),
         )
     },
     "S": {
-        'name': "properties",
+        'name': "prop_subt",
         'descr': "SUB_EXT",
         'sequence': (
             (SUBT_EXTR, {'where': {'prop_subt': None}}),

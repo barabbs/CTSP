@@ -1,4 +1,5 @@
 from .core import Calculation
+from modules.coding import Coding, Cover
 from modules import var
 
 
@@ -29,11 +30,12 @@ class CANON_Smart(CANON_Base):
         super().__init__(k=k, **kwargs)
 
     def _canon_calc(self, coding):
-        for reorder in ((coding,) if coding.covers[0].parts != coding.covers[1].parts else (coding, ~coding)):
-            base_cover = coding.covers[0]
-            for trans in base_cover.get_translations():
-                if reorder.apply_translation(trans) < coding:
-                    return False
+        for coding_reorder in ((coding,) if coding.covers[0].parts != coding.covers[1].parts else (coding, ~coding)):
+            base_cover = coding_reorder.covers[0]
+            for cover_reorder in base_cover.cover_reordering():
+                for trans in Cover(cover_reorder).get_translations():
+                    if coding_reorder.apply_translation(trans) < coding:
+                        return False
         return True
 
 
@@ -44,6 +46,6 @@ class CANON_Quick(CANON_Smart):
         raise NotImplemented
 
 
-CALCULATIONS_LIST = (CANON_Direct,
-                     CANON_Smart,
+CALCULATIONS_LIST = (CANON_Smart,
+                     CANON_Direct,
                      CANON_Quick)

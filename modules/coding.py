@@ -3,14 +3,14 @@ import numpy as np
 import modules.utility as utl
 
 
-# def canonic_components_reordering(components):
-#     if len(components) == 0:
-#         yield tuple()
-#         return
-#     parts = components[0].parts
-#     for head in permutations(filter(lambda x: x.parts == parts, components)):
-#         for tail in canonic_components_reordering(tuple(filter(lambda x: x.parts != parts, components))):
-#             yield *head, *tail
+def cover_components_reordering(components, parts):
+    if len(components) == 0:
+        yield tuple()
+        return
+    part = parts[0]
+    for _, head in permutations(filter(lambda x: x[0] == part, zip(parts, components))):
+        for _, tail in cover_components_reordering(tuple(filter(lambda x: x[0] != part, zip(parts, components)))):
+            yield *head, *tail
 
 
 class Coding(object):
@@ -40,26 +40,32 @@ class Coding(object):
         parts = components[0].parts
         for head in permutations(filter(lambda x: x.parts == parts, components)):
             for tail in self.code_reordering(tuple(filter(lambda x: x.parts != parts, components))):
-                yield Coding((*head, *tail))
+                yield (*head, *tail)
 
     def is_sorted(self):
         # TODO: Check for sorting between Covers
         return all(c.is_sorted() for c in self.covers)
 
     def is_canon(self):
-        for reorder in self.code_reordering(self.covers):
-            base_cover = next(iter(reorder))
-            for trans in base_cover.get_translations():
-                if reorder.apply_translation(trans) < self:
-                    return False
+        for code_reorder in self.code_reordering(self.covers):
+            coding_reorder = Coding(code_reorder)
+            base_cover = next(iter(coding_reorder))
+            for cover_reorder in base_cover.cover_reordering():
+                for trans in Cover(cover_reorder).get_translations():
+                    if coding_reorder.apply_translation(trans) < self:
+                        return False
         return True
 
     def get_translations(self):
         translations = list()
-        for reorder in self.code_reordering(self.covers):
-            base_cover = next(iter(reorder))
-            for trans in base_cover.get_translations():
-                translations.append(reorder.apply_translation(trans))
+        for code_reorder in self.code_reordering(self.covers):
+            # order = sum(code_reorder[0].cycles, start=tuple())
+            coding_reorder = Coding(code_reorder)
+            base_cover = next(iter(Coding(coding_reorder)))
+            for cover_reorder in base_cover.cover_reordering():
+                for trans in Cover(cover_reorder).get_translations():
+                    # print("\t".join(f"<{k}> {v}" for k, v in sorted(trans.items(), key=lambda x: order.index(x[0]))))
+                    translations.append(coding_reorder.apply_translation(trans))
         return translations
 
     def __invert__(self):
@@ -98,6 +104,17 @@ class Cover(object):
 
     def is_sorted(self):
         return all((-len(x), *x) < (-len(y), *y) for x, y in zip(self.cycles, self.cycles[1:]))
+
+    def cover_reordering(self, components=None):
+        components = components if components is not None else self.cycles
+        if len(components) == 0:
+            yield tuple()
+            return
+        part = len(components[0])
+        for head in permutations(tuple(filter(lambda x: len(x) == part, components))):
+            for tail in self.cover_reordering(tuple(filter(lambda x: len(x) != part, components))):
+                yield (*head, *tail)
+
 
     def get_translations(self, index=0, start=0):
         if index == len(self.cycles):
