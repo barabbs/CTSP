@@ -11,7 +11,7 @@ from itertools import chain
 import os, logging
 import time
 import numpy as np
-from calculations import GAP
+from modules.calculations import GAP
 
 from sqlalchemy import create_engine, select, insert, update, bindparam, and_
 from sqlalchemy.orm import Session, aliased
