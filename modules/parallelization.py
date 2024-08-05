@@ -11,6 +11,7 @@ from itertools import chain
 import os, logging
 import time
 import numpy as np
+from calculations import GAP
 
 from sqlalchemy import create_engine, select, insert, update, bindparam, and_
 from sqlalchemy.orm import Session, aliased
@@ -188,9 +189,13 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
 
         next_commit, commit_counter, cache, committed = time.time() + options["commit_interval"], 0, list(), 0
         mapper = tuple()
+        if calc_type == GAP and n >= 10:
+            workers = options["workers"] // 2
+        else:
+            workers = options["workers"]
         with CalculatorProcessPool(
                 calculator=calculator, n=n, k=k, weights=weights,
-                max_workers=options["workers"],
+                max_workers=workers,
                 # max_tasks_per_child=chunksize * options["batch_chunks"],  # TODO: see if 'max_tasks_per_child' needed
                 # initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
         ) as executor:
