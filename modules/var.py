@@ -3,8 +3,9 @@ import os
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
-DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{strategy}{generator}{calculators}.cgdb")
-RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_{strategy}{generator}{calculators}.json")
+DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.cgdb")
+RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.json")
+BEST_GAPS_FILEPATH = os.path.join(DATA_DIR, "best_gaps.json")
 RUN_INFO_INDENT = 4
 
 # Table names

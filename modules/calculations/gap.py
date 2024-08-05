@@ -4,6 +4,7 @@ from more_itertools import powerset
 from itertools import permutations
 from .core import Calculation
 from modules import var
+from modules import utility as utl
 import os, logging
 
 
@@ -11,9 +12,10 @@ class GAP_Gurobi(Calculation):
     CALC_TYPE = var.CALC_GAP
     CALC_NAME = "Gurobi"
 
-    def __init__(self, n, gurobi_verbose=False, gurobi_reset=True, **kwargs):
+    def __init__(self, n, gurobi_verbose=False, gurobi_reset=True, gurobi_presolve=-1, **kwargs):
         self.n = n
-        self.verbose, self.reset = gurobi_verbose, gurobi_reset
+        self.verbose, self.reset, self.presolve = gurobi_verbose, gurobi_reset, gurobi_presolve
+        self.callback = None
         # Sets
         self.nodes = tuple(range(self.n))
         self.edges = tuple((i, j) for i in self.nodes for j in self.nodes if i != j)
@@ -31,10 +33,12 @@ class GAP_Gurobi(Calculation):
         return self.c[(u, v)] - self.y[(u, 0)] - self.y[(v, 1)] - sum(self.d[S] for S in S_x)
 
     def _init_model(self):
-        # print(f"Initializig gurobi model in process {os.getpid() - os.getppid():<4}")
+        # print(f"Initializing gurobi model in process {os.getpid() - os.getppid():<4}")
         self.env = gp.Env(params={"OutputFlag": int(self.verbose)})
+        # self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Presolve": self.presolve})
         self.model = gp.Model(env=self.env)
 
+        # CREATING VARIABLES AND CONSTRAINTS TAKES UP A LOT OF TIME!
         # Variables
         self.c = self.model.addVars(self.edges, name='c')
         self.y = self.model.addVars(self.nodes, (0, 1), lb=float('-inf'), name='y')
@@ -59,21 +63,117 @@ class GAP_Gurobi(Calculation):
             return self._init_model()
         raise AttributeError
 
-    def _calc(self, graph):
-        model = self.model
-        # print(f"    {os.getpid() - os.getppid():<4}")
-
-        if self.reset:
-            model.reset()
+    def _update_obj_constr(self, graph):
         for u, v, value in graph.edge_count_generator(weight=True):
             self.c[(u, v)].Obj = value
             self.dual_constr[(u, v)].Sense = '=' if value > 0 else '>'
-        model.optimize()
-        return {var.GRAPH_TABLE: {'gap': 1 / model.objVal}}
-        # return {var.GRAPH_TABLE: {'gap': 1 / self.model.objVal}, var.GAP_INFO_TABLE: utl.convert_raw_gurobi_info(raw_info)}
+
+    def _calc(self, graph):
+        # print(f"    {os.getpid() - os.getppid():<4}")
+        if self.reset:
+            self.model.reset()
+        self._update_obj_constr(graph)
+        self.model.optimize(callback=self.callback)
+        if self.model.Status == GRB.OPTIMAL:  # Optimal solution found
+            return {var.GRAPH_TABLE: {'gap': 1 / self.model.objVal}}
+        elif self.model.Status == GRB.INFEASIBLE or self.model.Status == GRB.INTERRUPTED:
+            return {var.GRAPH_TABLE: {'gap': 0}}
+        logging.warning(f"Status {self.model.Status} of optimization for graph {graph} not recognized!")
 
 
-CALCULATIONS_LIST = (GAP_Gurobi,)
+BOUND_THRESHOLD = 1e-15
+
+
+class GAP_Gurobi_Bound_Base(GAP_Gurobi):
+    CALC_TYPE = var.CALC_GAP
+
+    def __init__(self, n, obj_bound=None, **kwargs):
+        self.obj_bound = obj_bound or utl.get_best_gap(n - 1)
+        if self.obj_bound is not None:
+            self.obj_bound = (1 / self.obj_bound) - BOUND_THRESHOLD
+        self.obj_bound_constr = None
+        super().__init__(n=n, **kwargs)
+
+
+class GAP_Gurobi_Bound_Constr(GAP_Gurobi_Bound_Base):
+    CALC_NAME = "Gurobi w/ Bound (constraint)"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.obj_bound_constr = None
+
+    def _update_obj_constr(self, graph):
+        super()._update_obj_constr(graph)
+        if self.obj_bound_constr is not None:
+            self.model.remove(self.obj_bound_constr)
+        if self.obj_bound is not None:
+            self.obj_bound_constr = self.model.addConstr(
+                gp.LinExpr(tuple((value, self.c[(u, v)]) for u, v, value in
+                                 graph.edge_count_generator(weight=True))) <= self.obj_bound,
+                name="obj_bound")
+            # self.obj_bound_constr = self.model.addConstr(
+            #     gp.quicksum((value * self.c[(u, v)] for u, v, value in
+            #                  graph.edge_count_generator(weight=True))) < self.obj_bound,
+            #     name="obj_bound")
+
+
+class GAP_Gurobi_Bound_Callback(GAP_Gurobi_Bound_Base):
+    CALC_NAME = "Gurobi w/ Bound (callback)"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.callback = self._get_callback()
+
+    def _get_callback(self):
+        # def callback(model, where):
+        #     print(f"Callback {where} - {getattr(model, "ObjBound", "-")}")
+        #     if where == GRB.Callback.MIP:
+        #         objbnd = model.cbGet(GRB.Callback.MIP_OBJBND)
+        #         print(f"MIP {objbnd}")
+        #     elif where == GRB.Callback.MIPNODE:
+        #         objbnd = model.cbGet(GRB.Callback.MIPNODE_OBJBND)
+        #         print(f"MIPNODE {objbnd}")
+        #     elif where == GRB.Callback.MIPSOL:
+        #         objbnd = model.cbGet(GRB.Callback.MIPSOL_OBJBND)
+        #         print(f"MIPSOL! {objbnd}")
+        #     else:
+        #         return
+        #     if objbnd > self.obj_bound:
+        #         model.terminate()
+        if self.obj_bound is not None:
+            def callback(model, where):
+                # print(getattr(model, "ObjBound", "-"))
+                if getattr(model, "ObjBound", 0) > self.obj_bound:
+                    model.terminate()
+
+            return callback
+        return None
+
+
+CALCULATIONS_LIST = (
+    GAP_Gurobi_Bound_Callback,
+    GAP_Gurobi,
+    GAP_Gurobi_Bound_Constr,
+)
+
+"""
+PERFORMANCE OF CALCULATIONS ON EXAMPLES  (Presolve = -1)
+
+Gurobi                              Gurobi w/ Bound (callback)          Gurobi w/ Bound (constraint)      
+------------------------------------------------------------------------------------------------------------
+2.00e+09 ± 1.2e+08  (+0.0e+00)      2.13e+09 ± 2.3e+07  (+1.3e+08)      2.24e+09 ± 2.2e+07  (+2.3e+08)      
+1.14e+10 ± 2.1e+09  (+0.0e+00)      5.20e+09 ± 3.7e+09  (-6.2e+09)      9.64e+09 ± 2.9e+09  (-1.8e+09)      
+1.21e+10 ± 1.4e+09  (+0.0e+00)      9.99e+09 ± 3.0e+09  (-2.2e+09)      1.46e+10 ± 2.0e+09  (+2.4e+09)      
+1.48e+10 ± 1.9e+09  (+0.0e+00)      1.18e+10 ± 2.3e+09  (-3.0e+09)      1.89e+10 ± 2.7e+09  (+4.2e+09)      
+1.09e+10 ± 4.2e+09  (+0.0e+00)      9.99e+09 ± 1.6e+09  (-8.8e+08)      1.27e+10 ± 2.7e+09  (+1.8e+09)      
+1.39e+10 ± 5.3e+09  (+0.0e+00)      7.75e+09 ± 3.3e+09  (-6.2e+09)      2.00e+10 ± 2.2e+09  (+6.0e+09)      
+1.03e+10 ± 2.2e+09  (+0.0e+00)      1.02e+10 ± 3.4e+09  (-1.1e+08)      1.49e+10 ± 6.8e+09  (+4.6e+09)      
+1.97e+10 ± 3.3e+09  (+0.0e+00)      1.62e+10 ± 3.8e+09  (-3.5e+09)      5.12e+09 ± 2.1e+09  (-1.5e+10)      
+1.97e+10 ± 2.5e+09  (+0.0e+00)      1.40e+10 ± 2.4e+09  (-5.6e+09)      9.93e+09 ± 1.7e+09  (-9.7e+09)      
+1.56e+10 ± 2.3e+09  (+0.0e+00)      1.28e+10 ± 1.9e+09  (-2.9e+09)      3.00e+10 ± 3.1e+09  (+1.4e+10)      
+1.78e+10 ± 2.3e+09  (+0.0e+00)      1.56e+10 ± 2.0e+09  (-2.2e+09)      4.15e+10 ± 3.8e+09  (+2.4e+10)      
+2.01e+09 ± 3.2e+07  (+0.0e+00)      1.97e+09 ± 3.2e+07  (-4.0e+07)      3.33e+10 ± 5.1e+09  (+3.1e+10)      
+"""
 
 if __name__ == '__main__':
     def get_vals(N, arcs, values=None):

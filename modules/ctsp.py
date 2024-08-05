@@ -8,7 +8,7 @@ from modules import utility as utl
 import os, logging
 import time
 
-from sqlalchemy import create_engine, select, insert, update, bindparam
+from sqlalchemy import create_engine, select, insert, update, bindparam, func
 from sqlalchemy.orm import Session
 import enlighten
 
@@ -181,3 +181,8 @@ OPTIONS
             if result is not False:
                 break
         utl.save_run_info_file(infos, start_time=start_time, time_name=calc_type)
+    with Session(engine) as session:
+        max_gap = session.query(func.max(models[GRAPH].gap)).scalar()
+        if max_gap is not None:
+            logging.info(f"Max gap found: {max_gap}")
+            utl.set_best_gap(n=n, gap=max_gap)

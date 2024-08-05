@@ -135,3 +135,18 @@ def calc_chunksize(n, calc_type, tot, workers, chunktime, max_chunksize, min_chu
     est_chunksize = int(np.ceil(chunktime / calc_time))
     logging.stage(f"    [est. chunksize: {est_chunksize:<8} (est. calc_time {calc_time:.2E})")
     return min(est_chunksize, int(np.ceil(tot / (workers * min_chunks))), max_chunksize)
+
+
+def set_best_gap(n, gap):
+    n = str(n)
+    with open(var.BEST_GAPS_FILEPATH, 'r') as f:
+        gaps = json.load(f)
+    gaps[n] = max(gaps.get(n, 0), gap)
+    with open(var.BEST_GAPS_FILEPATH, 'w') as f:
+        json.dump(gaps, f, indent=var.RUN_INFO_INDENT)
+
+
+def get_best_gap(n):
+    with open(var.BEST_GAPS_FILEPATH, 'r') as f:
+        gaps = json.load(f)
+    return gaps.get(str(n), None)
