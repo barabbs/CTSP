@@ -138,6 +138,8 @@ def calc_chunksize(n, calc_type, tot, workers, chunktime, max_chunksize, min_chu
 
 
 def set_best_gap(n, gap):
+    if gap <= 0:
+        return
     n = str(n)
     with open(var.BEST_GAPS_FILEPATH, 'r') as f:
         gaps = json.load(f)
