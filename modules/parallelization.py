@@ -161,9 +161,16 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return True
-        chunksize = utl.calc_chunksize(n, calc_type, tot, **options)
 
-        batch_size = chunksize * options["batch_chunks"] * options["workers"]
+        if calc_type == GAP and n >= 10:
+            workers = options["workers"] // 2
+        else:
+            workers = options["workers"]
+        new_opt = options.copy()
+        new_opt.pop("workers")
+        chunksize = utl.calc_chunksize(n, calc_type, tot, workers=workers, **new_opt)
+
+        batch_size = chunksize * options["batch_chunks"] * workers
         batches = int(np.ceil(tot / batch_size))
 
         batch_progbar = manager.counter(total=batches, desc=f"Batch ", leave=False)
@@ -189,10 +196,6 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
 
         next_commit, commit_counter, cache, committed = time.time() + options["commit_interval"], 0, list(), 0
         mapper = tuple()
-        if calc_type == GAP and n >= 10:
-            workers = options["workers"] // 2
-        else:
-            workers = options["workers"]
         with CalculatorProcessPool(
                 calculator=calculator, n=n, k=k, weights=weights,
                 max_workers=workers,
