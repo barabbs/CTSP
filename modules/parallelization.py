@@ -162,8 +162,8 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
             logging.trace(f"    Nothing to do :)")
             return True
 
-        if calc_type == GAP and n >= 10:
-            workers = options["workers"] // 2
+        if calc_type == GAP and options["gurobi_threads"] is not None:
+            workers = options["workers"] // options["gurobi_threads"]
         else:
             workers = options["workers"]
         new_opt = options.copy()

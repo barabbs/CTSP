@@ -12,9 +12,9 @@ class GAP_Gurobi(Calculation):
     CALC_TYPE = var.CALC_GAP
     CALC_NAME = "Gurobi"
 
-    def __init__(self, n, gurobi_verbose=False, gurobi_reset=True, gurobi_presolve=-1, **kwargs):
+    def __init__(self, n, gurobi_verbose=False, gurobi_reset=True, gurobi_presolve=-1, gurobi_threads=None, **kwargs):
         self.n = n
-        self.verbose, self.reset, self.presolve = gurobi_verbose, gurobi_reset, gurobi_presolve
+        self.verbose, self.reset, self.presolve, self.threads = gurobi_verbose, gurobi_reset, gurobi_presolve, gurobi_threads or 0
         self.callback = None
         # Sets
         self.nodes = tuple(range(self.n))
@@ -37,7 +37,7 @@ class GAP_Gurobi(Calculation):
 
     def _init_model(self):
         # print(f"{os.getpid() - os.getppid():<4} - Initializing gurobi model")
-        self.env = gp.Env(params={"OutputFlag": int(self.verbose)})
+        self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Threads": self.threads})
         # self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Presolve": self.presolve})
         self.model = gp.Model(env=self.env)
 

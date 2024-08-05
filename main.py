@@ -89,6 +89,10 @@ parser.add_argument("--batch_chunks", type=int, default=var.BATCH_CHUNKS,
                     help=f"[PARALL] number of chunks per batch  (default: {var.BATCH_CHUNKS})\n\n")
 parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCHES,
                     help=f"[PARALL] batches to preload  (default: {var.PRELOADED_BATCHES})\n\n")
+parser.add_argument("--gurobi_threads", type=int, default=None,
+                    help=f"[PARALL] number of threads for gurobi (if specified, also divides number of workers by this amount)\n\n")
+parser.add_argument("--gurobi_verbose", action="store_true",
+                    help="verbosity of integrality gap optimizer gurobi\n\n")
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
@@ -97,8 +101,6 @@ parser.add_argument("--max_commit_cache", type=int, default=var.MAX_COMMIT_CACHE
                     help=f"maximum commit cache size before committing to database  (default: {var.MAX_COMMIT_CACHE})\n\n")
 parser.add_argument("--sql_verbose", action="store_true",
                     help="verbosity of SqlAlchemy backend\n\n")
-parser.add_argument("--gurobi_verbose", action="store_true",
-                    help="verbosity of integrality gap optimizer gurobi\n\n")
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -121,6 +123,7 @@ if __name__ == '__main__':
                "batch_chunks": args.batch_chunks,
                "min_chunks": args.min_chunks,
                "preloaded_batches": args.preloaded_batches,
+               "gurobi_threads": args.gurobi_threads,
                "commit_interval": args.commit_interval,
                "max_commit_cache": args.max_commit_cache,
                "sql_verbose": args.sql_verbose,
