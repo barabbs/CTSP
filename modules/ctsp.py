@@ -184,5 +184,12 @@ OPTIONS
     with Session(engine) as session:
         max_gap = session.query(func.max(models[GRAPH].gap)).scalar()
         if max_gap is not None:
-            logging.info(f"Max gap found: {max_gap}")
+            if max_gap == 0:
+                max_gap = utl.get_best_gap(n - 1) or 1
+                logging.info(f"Max gap not improved: {max_gap}")
+            else:
+                logging.info(f"Max gap found: {max_gap}")
             utl.set_best_gap(n=n, gap=max_gap)
+        else:
+            logging.warning(f"No gap found!")
+
