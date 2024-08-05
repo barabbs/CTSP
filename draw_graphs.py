@@ -31,7 +31,7 @@ for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP):
     CALC_ROWS = '\n'.join(f"{i:>4}. {c.CALC_NAME}" for i, c in enumerate(CALCULATIONS[calc_type]))
     parser.add_argument(f"--{calc_type}", type=int, default=0,
                         help=f"selected calculation for {calc_type.upper()}, among the following (default: 0)\n" + CALC_ROWS + "\n\n")
-parser.add_argument("--no_draw", action="store_true",
+parser.add_argument("--no-draw", action="store_true",
                     help="dry run without drawing\n\n")
 
 

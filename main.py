@@ -78,17 +78,17 @@ parser.add_argument("-v", "--verbose", action='count', default=0,
 parser.add_argument("-q", "--quiet", action='count', default=0,
                     help="decrease output verbosity\n\n")
 parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
-                    help=f"<PARALL> max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)\n\n")
+                    help=f"[PARALL] max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)\n\n")
 parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
-                    help=f"<PARALL> approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)\n\n")
+                    help=f"[PARALL] approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)\n\n")
 parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
-                    help=f"<PARALL> maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})\n\n")
+                    help=f"[PARALL] maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})\n\n")
 parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
-                    help=f"<PARALL> min chunks per run  (default: {var.MIN_CHUNKS})\n\n")
+                    help=f"[PARALL] min chunks per run  (default: {var.MIN_CHUNKS})\n\n")
 parser.add_argument("--batch_chunks", type=int, default=var.BATCH_CHUNKS,
-                    help=f"<PARALL> number of chunks per batch  (default: {var.BATCH_CHUNKS})\n\n")
+                    help=f"[PARALL] number of chunks per batch  (default: {var.BATCH_CHUNKS})\n\n")
 parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCHES,
-                    help=f"<PARALL> batches to preload  (default: {var.PRELOADED_BATCHES})\n\n")
+                    help=f"[PARALL] batches to preload  (default: {var.PRELOADED_BATCHES})\n\n")
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
