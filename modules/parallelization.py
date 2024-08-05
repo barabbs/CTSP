@@ -5,7 +5,7 @@ from modules import var
 from modules import utility as utl
 
 from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
+from concurrent.futures.process import BrokenProcessPool, _ExceptionWithTraceback, _sendback_result
 from functools import partial
 from itertools import chain
 import os, logging
@@ -22,6 +22,80 @@ COMMIT_INSERT = lambda c: insert(c).values(coding=bindparam("id"))
 COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
                 TIMINGS: COMMIT_UPDATE,
                 GAP_INFO: COMMIT_INSERT}
+
+
+def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tasks=None):
+    """Evaluates calls from call_queue and places the results in result_queue.
+
+    This worker is run in a separate process.
+
+    Args:
+        call_queue: A ctx.Queue of _CallItems that will be read and
+            evaluated by the worker.
+        result_queue: A ctx.Queue of _ResultItems that will be written
+            to by the worker.
+    """
+    logging.process(f"                [{os.getpid() - os.getppid():>4}] START")
+    # Initialization
+    os.nice(var.PROCESSES_NICENESS)
+    calculator.initialize()
+
+    num_tasks = 0
+    processed_items = 0
+    exit_pid = None
+    while True:
+        call_item = call_queue.get(block=True)
+        if call_item is None:
+            # Wake up queue management thread
+            result_queue.put(os.getpid())
+            logging.process(f"                [{os.getpid() - os.getppid():>4}] END   ({processed_items} processed)")
+            return
+
+        if max_tasks is not None:
+            num_tasks += 1
+            if num_tasks >= max_tasks:
+                exit_pid = os.getpid()
+
+        try:
+            r = list()
+            for coding in call_item.fn(*call_item.args, **call_item.kwargs):  # TODO: Remove redundant call to 'returner' func
+                # print(f"{os.getpid() - os.getppid():<4} - {coding}")
+                graph = Graph(n=n, k=k, weights=weights, coding=coding)
+                r.append(calculator.calc(graph))
+                del graph
+                processed_items += 1
+        except BaseException as e:
+            exc = _ExceptionWithTraceback(e, e.__traceback__)
+            _sendback_result(result_queue, call_item.work_id, exception=exc,
+                             exit_pid=exit_pid)
+        else:
+            _sendback_result(result_queue, call_item.work_id, result=r,
+                             exit_pid=exit_pid)
+            del r
+
+        # Liberate the resource as soon as possible, to avoid holding onto
+        # open files or shared memory that is not needed anymore
+        del call_item
+
+        if exit_pid is not None:
+            logging.process(f"                [{os.getpid() - os.getppid():>4}] EXIT  ({processed_items} processed)")
+            return
+
+
+class CalculatorProcessPool(ProcessPoolExecutor):
+    def __init__(self, calculator, n, k, weights, **kwargs):
+        self.calculator, self.n, self.k, self.weights = calculator, n, k, weights
+        super().__init__(**kwargs)
+
+    def _spawn_process(self):
+        process_worker = partial(_process_worker, self.calculator, self.n, self.k, self.weights)
+        p = self._mp_context.Process(
+            target=process_worker,
+            args=(self._call_queue,
+                  self._result_queue,
+                  self._max_tasks_per_child))
+        p.start()
+        self._processes[p.pid] = p
 
 
 def _commit_cached(session, models, cache, codings, start, manager):
@@ -43,19 +117,23 @@ def _commit_cached(session, models, cache, codings, start, manager):
     return end
 
 
-def _calc_helper(calculator, n, k, weights, coding):
-    # logging.stage(f"            {os.getpid():>8}({os.getpid() - os.getppid():<4})  {num:>8}  {calc_type.upper():<10} {coding}")
-    graph = Graph(n=n, k=k, weights=weights, coding=coding)
-    return calculator.calc(graph)
-    # calc = graph.calculate(calc_type)
-    # del graph
-    # gc.collect()
-    # return calc
+# def _calc_helper(calculator, n, k, weights, coding):
+#     # logging.stage(f"            {os.getpid():>8}({os.getpid() - os.getppid():<4})  {num:>8}  {calc_type.upper():<10} {coding}")
+#     print(f"{os.getpid() - os.getppid():<4} - {coding}")
+#     # calculator.initialize()
+#     graph = Graph(n=n, k=k, weights=weights, coding=coding)
+#     return calculator.calc(graph)
+#     # calc = graph.calculate(calc_type)
+#     # del graph
+#     # gc.collect()
+#     # return calc
 
+def returner(x):  # TODO: Remove redundant 'returner' func
+    return x
 
-def _launch_batch(batch, batch_size, codings, mapper, executor, calc_func, chunksize, batch_progbar):
+def _launch_batch(batch, batch_size, codings, mapper, executor, chunksize, batch_progbar):
     codings_batch = codings[batch * batch_size: (batch + 1) * batch_size]
-    new_mapper = executor.map(calc_func, codings_batch, chunksize=chunksize)
+    new_mapper = executor.map(returner, codings_batch, chunksize=chunksize)  # TODO: Remove redundant call to 'returner' func
     if len(codings_batch) > 0:
         logging.stage(f"        Batch {batch + 1:>6}")
         batch_progbar.update()
@@ -105,20 +183,22 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
             ).where(graph_alias.coding.is_(None), *where_smnt)
         # codings_gen = session.scalars(statement).partitions(size=batch_size)
         codings = session.scalars(statement).all()
-        calculator = calculators.get_calculation(calc_type, n=n, k=k, weight=weights, **options)
-        calc_func = partial(_calc_helper, calculator, n, k, weights)
+        calculator = calculators.get_calculation(calc_type, n=n, k=k, weights=weights, **options)
+        # calc_func = partial(_calc_helper, calculator, n, k, weights)
 
         next_commit, commit_counter, cache, committed = time.time() + options["commit_interval"], 0, list(), 0
         mapper = tuple()
-        with ProcessPoolExecutor(max_workers=options["workers"],
-                                 initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
-                                 max_tasks_per_child=chunksize * options["batch_chunks"],
-                                 ) as executor:
+        with CalculatorProcessPool(
+                calculator=calculator, n=n, k=k, weights=weights,
+                max_workers=options["workers"],
+                # max_tasks_per_child=chunksize * options["batch_chunks"],  # TODO: see if 'max_tasks_per_child' needed
+                # initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
+        ) as executor:
             for pre_batch in range(options["preloaded_batches"]):
-                mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, calc_func, chunksize,
+                mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, chunksize,
                                        batch_progbar)
             for batch in range(options["preloaded_batches"], batches + options["preloaded_batches"]):
-                mapper = _launch_batch(batch, batch_size, codings, mapper, executor, calc_func, chunksize,
+                mapper = _launch_batch(batch, batch_size, codings, mapper, executor, chunksize,
                                        batch_progbar)
                 for i in range(batch_size):
                     try:
@@ -126,7 +206,8 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
                     except StopIteration:
                         break
                     except BrokenProcessPool:
-                        logging.warning(f"    (batch: {batch}, num: {i})  A process in the process pool was terminated abruptly, trying to restart...")
+                        logging.warning(
+                            f"    (batch: {batch}, num: {i})  A process in the process pool was terminated abruptly, trying to restart...")
                         _commit_cached(session=session, models=models,
                                        cache=cache, codings=codings,
                                        start=committed, manager=manager)

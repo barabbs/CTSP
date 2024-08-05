@@ -18,10 +18,10 @@ logging.addLevelName(logging.STAGE, 'STAGE')
 logging.Logger.stage = partialmethod(logging.Logger.log, logging.STAGE)
 logging.stage = partial(logging.log, logging.STAGE)
 
-logging.RESULT = 12
-logging.addLevelName(logging.RESULT, 'RESLT')
-logging.Logger.result = partialmethod(logging.Logger.log, logging.RESULT)
-logging.result = partial(logging.log, logging.RESULT)
+logging.PROCESS = 12
+logging.addLevelName(logging.PROCESS, 'PRCSS')
+logging.Logger.process = partialmethod(logging.Logger.log, logging.PROCESS)
+logging.process = partial(logging.log, logging.PROCESS)
 
 
 def init_logging(level):

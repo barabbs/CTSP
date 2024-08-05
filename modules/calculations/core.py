@@ -1,4 +1,4 @@
-import time
+import os, time
 from modules import var
 
 
@@ -7,7 +7,13 @@ class Calculation(object):
     CALC_NAME = None
 
     def __init__(self, **kwargs):
+        # print(f"{os.getpid() - os.getppid():<4} - Initializing calculation {self.CALC_NAME}")
         pass
+
+    def _initialize(self):
+        pass
+    def initialize(self):
+        self._initialize()
 
     def _calc(self, graph):
         return dict()

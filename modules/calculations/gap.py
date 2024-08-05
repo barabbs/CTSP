@@ -24,6 +24,9 @@ class GAP_Gurobi(Calculation):
         self.tours = tuple(permutations(range(1, self.n)))
         super().__init__(**kwargs)
 
+    def _initialize(self):
+        self.model
+
     def _get_tour_cost_constr(self, tour):
         return self.c[(0, tour[0])] + sum(self.c[(u, v)] for u, v in zip(tour, tour[1:])) + self.c[(tour[-1], 0)]
 
@@ -33,7 +36,7 @@ class GAP_Gurobi(Calculation):
         return self.c[(u, v)] - self.y[(u, 0)] - self.y[(v, 1)] - sum(self.d[S] for S in S_x)
 
     def _init_model(self):
-        # print(f"Initializing gurobi model in process {os.getpid() - os.getppid():<4}")
+        # print(f"{os.getpid() - os.getppid():<4} - Initializing gurobi model")
         self.env = gp.Env(params={"OutputFlag": int(self.verbose)})
         # self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Presolve": self.presolve})
         self.model = gp.Model(env=self.env)
@@ -59,6 +62,7 @@ class GAP_Gurobi(Calculation):
         return self.model
 
     def __getattr__(self, item):
+        # print(f"{os.getpid() - os.getppid():<4} - GETATTR {item}")
         if item == 'model':
             return self._init_model()
         raise AttributeError
