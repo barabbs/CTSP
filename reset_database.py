@@ -7,7 +7,7 @@ from modules.calculations import Calculators
 from modules.ctsp import initialize_database
 from modules.models import get_models, GRAPH, TIMINGS
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, update
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
@@ -26,15 +26,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
     k = args.k
     n = args.n
-    weights = args.weights
+    weights = args.weights or (1,) * k
     strategy = args.strategy.upper()
     generator = args.generator.lower()
     calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
+    calculators = Calculators(calcs_indices)
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights,
-                                 strategy=strategy, generator=generator, calculators=calculators,
-                                 **options)
+                                 strategy=strategy, generator=generator, calculators=calculators,)
     with Session(engine) as session:
-        session.execute(COMMIT_TYPES[mod](models[mod]),
-                        tuple(dict(id=codings[start + i], **result[mod]) for i, result in enumerate(cache)))
+        print(f"Total  {session.query(models[GRAPH]).count()}")
+        print(f"Null   {session.query(models[GRAPH]).where(models[GRAPH].gap.is_(None)).count()}")
+        session.execute(update(models[GRAPH]).values(gap=None))
+        session.commit()
+        print(f"New    {session.query(models[GRAPH]).where(models[GRAPH].gap.is_(None)).count()}")
+
