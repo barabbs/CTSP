@@ -5,7 +5,7 @@ from modules.ctsp import initialize_database
 from main import STRATEGIES_TABLE, GENERATORS_TABLE
 from modules.calculations import Calculators, CANON, CERTIFICATE, SUBT_EXTR, GAP, CALCULATIONS
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 import enlighten
 import argparse
@@ -21,8 +21,10 @@ parser.add_argument("-w", "--weights", type=int, default=None,
                     help="weights of covers in graph (sequence separated by whitespace)\n\n")
 parser.add_argument("-b", "--best", type=int, default=None,
                     help="number of graphs with highest gap to draw\n\n")
-parser.add_argument("-g", "--only_gap", action="store_true",
+parser.add_argument("-g", "--only-gap", action="store_true",
                     help="only draw graphs with an integrality gap (implicit when -b specified)\n\n")
+parser.add_argument("-r", "--random", action="store_true",
+                    help="select entries randomly\n\n")
 parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
                     help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY})" + STRATEGIES_TABLE)
 parser.add_argument("--generator", type=str, default=var.DEFAULT_GENERATOR,
@@ -36,26 +38,29 @@ parser.add_argument("--no-draw", action="store_true",
 
 
 def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_best=None,
-        generator=var.DEFAULT_GENERATOR, calculators=None, no_draw=False):
+        generator=var.DEFAULT_GENERATOR, calculators=None, no_draw=False, random=False):
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights,
                                  strategy=strategy, generator=generator, calculators=calculators)
-    with Session(engine) as session:
+    with (Session(engine) as session):
         statement = select(models[GRAPH])
         if only_gap:
-            statement = statement.where(models[GRAPH].gap.is_not(None)).order_by(models[GRAPH].gap.desc())
+            statement = statement.where(models[GRAPH].gap.is_not(None))
+            if not random:
+                statement = statement.order_by(models[GRAPH].gap.desc())
+        if random:
+            statement = statement.order_by(models[GRAPH].gap.desc()).order_by(func.random())
+        if n_best is not None:
+            statement = statement.limit(n_best)
         graphs = session.scalars(statement).all()
         tot = n_best or len(graphs)
-        print(f"Drawing {tot} graphs...")
+        print(f"Drawing {tot} graphs (only_gap: {only_gap}, n_best: {n_best}, random: {random}, no_draw: {no_draw})")
         progbar = manager.counter(total=n_best or len(graphs), desc=f"Drawing", leave=False)
         for i, graph in enumerate(graphs):
-            if n_best is not None and i == n_best:
-                break
-            if only_gap:
-                print(f"{i:>6}. {str(graph)[9:]:<64}    gap: {graph.gap:.5f}")
+            print(f"{i:>6}. {str(graph)[9:]:<64}    gap: " + (f"{graph.gap:.5f}" if graph.gap is not None else "---"))
             if not no_draw:
                 graph.draw()
             progbar.update()
@@ -79,4 +84,4 @@ if __name__ == '__main__':
                     continue
             run(n=n, k=k, weights=args.weights,
                 strategy=args.strategy.upper(), generator=args.generator.lower(), calculators=calculators,
-                only_gap=gap, n_best=args.best, no_draw=args.no_draw)
+                only_gap=gap, n_best=args.best, no_draw=args.no_draw, random=args.random)
