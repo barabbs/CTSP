@@ -32,6 +32,11 @@ class GAP_Gurobi(Calculation):
     def _initialize(self):
         self.model
 
+    def _close(self):
+        self.model.dispose()
+        self.env.dispose()
+        del self.model
+
     def _get_tour_cost_constr(self, tour):
         return self.c[(0, tour[0])] + sum(self.c[(u, v)] for u, v in zip(tour, tour[1:])) + self.c[(tour[-1], 0)]
 

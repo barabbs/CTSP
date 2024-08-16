@@ -49,6 +49,7 @@ def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tas
         if call_item is None:
             # Wake up queue management thread
             result_queue.put(os.getpid())
+            calculator.close()
             logging.process(f"                [{os.getpid() - os.getppid():>4}] END   ({processed_items} processed)")
             return
 
@@ -79,6 +80,7 @@ def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tas
         del call_item
 
         if exit_pid is not None:
+            calculator.close()
             logging.process(f"                [{os.getpid() - os.getppid():>4}] EXIT  ({processed_items} processed)")
             return
 

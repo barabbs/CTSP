@@ -12,8 +12,15 @@ class Calculation(object):
 
     def _initialize(self):
         pass
+
     def initialize(self):
         self._initialize()
+
+    def _close(self):
+        pass
+
+    def close(self):
+        self._close()
 
     def _calc(self, graph):
         return dict()
