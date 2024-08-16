@@ -131,6 +131,7 @@ if __name__ == '__main__':
     options = {"delete": args.delete,
                "workers": args.workers,
                "chunktime": args.chunktime,
+               "workers_wait_time": args.workers_wait_time,
                "max_chunksize": args.max_chunksize,
                "batch_chunks": args.batch_chunks,
                "min_chunks": args.min_chunks,
