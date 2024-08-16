@@ -174,12 +174,17 @@ OPTIONS
         logging.info(
             f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
         start_time = time.time()
+        workers = options["workers"]
         while True:
             result = parallel_run(engine=engine, models=models,
                                   n=n, k=k, weights=weights,
-                                  calc_type=calc_type, calculators=calculators, **statements, **options)
+                                  calc_type=calc_type, calculators=calculators, workers=workers,
+                                  **statements, **options)
             if result is not False:
                 break
+            else:
+                workers -= 1
+                logging.info(f"Retrying with {workers} (out of {options["workers"]})")
         utl.save_run_info_file(infos, start_time=start_time, time_name=calc_type)
     with Session(engine) as session:
         max_gap = session.query(func.max(models[GRAPH].gap)).scalar()

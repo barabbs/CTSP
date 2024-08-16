@@ -141,7 +141,7 @@ def _launch_batch(batch, batch_size, codings, mapper, executor, chunksize, batch
     return chain(mapper, new_mapper)
 
 
-def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=None, group_by=None,
+def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers, where=None, group_by=None,
                  **options):  # TODO: Sistemare questo schifo immondo.
     manager = enlighten.get_manager()
     with Session(engine) as session:
@@ -161,11 +161,6 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, where=No
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return True
-
-        if calc_type == GAP and options["gurobi_threads"] is not None:
-            workers = options["workers"] // options["gurobi_threads"]
-        else:
-            workers = options["workers"]
         new_opt = options.copy()
         new_opt.pop("workers")
         chunksize = utl.calc_chunksize(n, calc_type, tot, workers=workers, **new_opt)

@@ -5,16 +5,21 @@ from itertools import permutations
 from .core import Calculation
 from modules import var
 from modules import utility as utl
-import os, logging
+import os, time, logging
 
 
 class GAP_Gurobi(Calculation):
     CALC_TYPE = var.CALC_GAP
     CALC_NAME = "Gurobi"
 
-    def __init__(self, n, gurobi_verbose=False, gurobi_reset=True, gurobi_presolve=-1, gurobi_threads=None, **kwargs):
+    def __init__(self, n, gurobi_verbose=False, gurobi_reset=0,
+                 gurobi_method=-1, gurobi_presolve=-1, gurobi_pre_sparsify=-1, gurobi_threads=None,
+                 # presolve_queue=None,
+                 **kwargs):
         self.n = n
-        self.verbose, self.reset, self.presolve, self.threads = gurobi_verbose, gurobi_reset, gurobi_presolve, gurobi_threads or 0
+        self.verbose, self.reset = gurobi_verbose, gurobi_reset
+        self.method, self.presolve, self.pre_sparsify, self.threads = gurobi_method, gurobi_presolve, gurobi_pre_sparsify, gurobi_threads or 0
+        # self.presolve_queue = presolve_queue
         self.callback = None
         # Sets
         self.nodes = tuple(range(self.n))
@@ -37,7 +42,8 @@ class GAP_Gurobi(Calculation):
 
     def _init_model(self):
         # print(f"{os.getpid() - os.getppid():<4} - Initializing gurobi model")
-        self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Threads": self.threads})
+        self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Threads": self.threads,
+                                  "Presolve": self.presolve, "Method": self.method, "PreSparsify": self.pre_sparsify})
         # self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Presolve": self.presolve})
         self.model = gp.Model(env=self.env)
 
@@ -74,9 +80,12 @@ class GAP_Gurobi(Calculation):
 
     def _calc(self, graph):
         # print(f"    {os.getpid() - os.getppid():<4}")
-        if self.reset:
-            self.model.reset()
+        if self.reset is not None:
+            self.model.reset(self.reset)
         self._update_obj_constr(graph)
+        # if self.presolve_queue is not None:
+        #     self.model.presolve()
+        #     self.presolve_queue.put(time.process_time_ns())
         self.model.optimize(callback=self.callback)
         if self.model.Status == GRB.OPTIMAL:  # Optimal solution found
             return {var.GRAPH_TABLE: {'gap': 1 / self.model.objVal}}
@@ -146,6 +155,7 @@ class GAP_Gurobi_Bound_Callback(GAP_Gurobi_Bound_Base):
         #         model.terminate()
         if self.obj_bound is not None:
             def callback(model, where):
+                # print(f"Callback {where} - {getattr(model, "ObjBound", "-")}")
                 # print(getattr(model, "ObjBound", "-"))
                 if getattr(model, "ObjBound", 0) > self.obj_bound:
                     model.terminate()

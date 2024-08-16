@@ -89,10 +89,20 @@ parser.add_argument("--batch_chunks", type=int, default=var.BATCH_CHUNKS,
                     help=f"[PARALL] number of chunks per batch  (default: {var.BATCH_CHUNKS})\n\n")
 parser.add_argument("--preloaded_batches", type=int, default=var.PRELOADED_BATCHES,
                     help=f"[PARALL] batches to preload  (default: {var.PRELOADED_BATCHES})\n\n")
-parser.add_argument("--gurobi_threads", type=int, default=None,
-                    help=f"[PARALL] number of threads for gurobi (if specified, also divides number of workers by this amount)\n\n")
+
 parser.add_argument("--gurobi_verbose", action="store_true",
                     help="verbosity of integrality gap optimizer gurobi\n\n")
+parser.add_argument("--gurobi_reset", type=int, default=var.GUROBI_RESET,
+                    help=f"reset level of gurobi model in-between instances\n\n")
+parser.add_argument("--gurobi_method", type=int, default=var.GUROBI_METHOD,
+                    help=f"gurobi Method parameter\n\n")
+parser.add_argument("--gurobi_presolve", type=int, default=var.GUROBI_PRESOLVE,
+                    help=f"gurobi Presolve parameter\n\n")
+parser.add_argument("--gurobi_pre_sparsify", type=int, default=var.GUROBI_PRE_SPARSIFY,
+                    help=f"gurobi PreSparsify parameter\n\n")
+parser.add_argument("--gurobi_threads", type=int, default=var.GUROBI_THREADS,
+                    help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
+
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
@@ -123,11 +133,17 @@ if __name__ == '__main__':
                "batch_chunks": args.batch_chunks,
                "min_chunks": args.min_chunks,
                "preloaded_batches": args.preloaded_batches,
+
+               "gurobi_verbose": args.gurobi_verbose,
+               "gurobi_reset": args.gurobi_reset,
+               "gurobi_method": args.gurobi_method,
+               "gurobi_presolve": args.gurobi_presolve,
+               "gurobi_pre_sparsify": args.gurobi_pre_sparsify,
                "gurobi_threads": args.gurobi_threads,
+
                "commit_interval": args.commit_interval,
                "max_commit_cache": args.max_commit_cache,
-               "sql_verbose": args.sql_verbose,
-               "gurobi_verbose": args.gurobi_verbose}
+               "sql_verbose": args.sql_verbose, }
 
     calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
 
