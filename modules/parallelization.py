@@ -200,8 +200,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
         mapper = tuple()
         with CalculatorProcessPool(
                 calculator=calculator, n=n, k=k, weights=weights,
-                max_workers=workers,
-                **options
+                workers_wait_time=options["workers_wait_time"], max_workers=workers,
                 # max_tasks_per_child=chunksize * options["batch_chunks"],  # TODO: see if 'max_tasks_per_child' needed
                 # initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
         ) as executor:
