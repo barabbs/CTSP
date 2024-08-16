@@ -175,11 +175,13 @@ OPTIONS
             f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
         start_time = time.time()
         workers = options["workers"]
+        new_opt = options.copy()
+        new_opt.pop("workers")
         while True:
             result = parallel_run(engine=engine, models=models,
                                   n=n, k=k, weights=weights,
                                   calc_type=calc_type, calculators=calculators, workers=workers,
-                                  **statements, **options)
+                                  **statements, **new_opt)
             if result is not False:
                 break
             else:

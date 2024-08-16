@@ -170,9 +170,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return True
-        new_opt = options.copy()
-        new_opt.pop("workers")
-        chunksize = utl.calc_chunksize(n, calc_type, tot, workers=workers, **new_opt)
+        chunksize = utl.calc_chunksize(n, calc_type, tot, workers=workers, **options)
 
         batch_size = chunksize * options["batch_chunks"] * workers
         batches = int(np.ceil(tot / batch_size))
