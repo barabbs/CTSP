@@ -234,7 +234,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
                             next_commit, commit_counter, cache = time.time() + options["commit_interval"], 0, list()
             except KeyboardInterrupt:
                 logging.warning(f"    KeyboardInterrupt received")
-                executor.shutdown(wait=False)
+                executor.shutdown(wait=False, cancel_futures=True)
             _commit_cached(session=session, models=models,
                            cache=cache, codings=codings,
                            start=committed, manager=manager)
