@@ -186,7 +186,7 @@ OPTIONS
                 break
             else:
                 workers -= 1
-                logging.info(f"Retrying with {workers} (out of {options["workers"]})")
+                logging.info(f"Retrying with {workers} workers (out of {options["workers"]})")
         utl.save_run_info_file(infos, start_time=start_time, time_name=calc_type)
     with Session(engine) as session:
         max_gap = session.query(func.max(models[GRAPH].gap)).scalar()
