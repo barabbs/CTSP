@@ -13,15 +13,15 @@ logging.addLevelName(logging.TRACE, 'TRACE')
 logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
 logging.trace = partial(logging.log, logging.TRACE)
 
-logging.STAGE = 15
-logging.addLevelName(logging.STAGE, 'STAGE')
-logging.Logger.stage = partialmethod(logging.Logger.log, logging.STAGE)
-logging.stage = partial(logging.log, logging.STAGE)
-
-logging.PROCESS = 12
+logging.PROCESS = 15
 logging.addLevelName(logging.PROCESS, 'PRCSS')
 logging.Logger.process = partialmethod(logging.Logger.log, logging.PROCESS)
 logging.process = partial(logging.log, logging.PROCESS)
+
+logging.STAGE = 12
+logging.addLevelName(logging.STAGE, 'STAGE')
+logging.Logger.stage = partialmethod(logging.Logger.log, logging.STAGE)
+logging.stage = partial(logging.log, logging.STAGE)
 
 
 def init_logging(level):
@@ -122,8 +122,10 @@ if __name__ == '__main__':
     elif verbosity == 1:
         init_logging(level=logging.TRACE)
     elif verbosity == 2:
+        init_logging(level=logging.PROCESS)
+    elif verbosity == 3:
         init_logging(level=logging.STAGE)
-    elif verbosity >= 3:
+    elif verbosity >= 4:
         init_logging(level=logging.DEBUG)
     elif verbosity <= -1:
         init_logging(level=logging.WARNING)

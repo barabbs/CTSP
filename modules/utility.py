@@ -133,7 +133,7 @@ def calc_chunksize(n, calc_type, tot, workers, chunktime, max_chunksize, min_chu
     params = var.EST_CALC_TIME_PARAMS[calc_type]
     calc_time = params[0] * np.exp(params[1] * n)
     est_chunksize = int(np.ceil(chunktime / calc_time))
-    logging.stage(f"    [est. chunksize: {est_chunksize:<8} (est. calc_time {calc_time:.2E})")
+    logging.trace(f"    [est. chunksize: {est_chunksize:<8} (est. calc_time {calc_time:.2E})")
     return min(est_chunksize, int(np.ceil(tot / (workers * min_chunks))), max_chunksize)
 
 
