@@ -1,3 +1,5 @@
+import random
+
 from modules.models import get_models, GRAPH, TIMINGS, GAP_INFO
 from modules.graph import Graph
 from modules.combinatorics import full_codings_generator
@@ -25,7 +27,7 @@ COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
                 GAP_INFO: COMMIT_INSERT}
 
 
-def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tasks=None):
+def _process_worker(calculator, n, k, weights, workers_wait_time, call_queue, result_queue, max_tasks=None):
     """Evaluates calls from call_queue and places the results in result_queue.
 
     This worker is run in a separate process.
@@ -36,6 +38,7 @@ def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tas
         result_queue: A ctx.Queue of _ResultItems that will be written
             to by the worker.
     """
+    time.sleep(random.random() * workers_wait_time)
     logging.process(f"                [{os.getpid() - os.getppid():>4}] START")
     # Initialization
     os.nice(var.PROCESSES_NICENESS)
@@ -60,7 +63,8 @@ def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tas
 
         try:
             r = list()
-            for coding in call_item.fn(*call_item.args, **call_item.kwargs):  # TODO: Remove redundant call to 'returner' func
+            for coding in call_item.fn(*call_item.args,
+                                       **call_item.kwargs):  # TODO: Remove redundant call to 'returner' func
                 # print(f"{os.getpid() - os.getppid():<4} - {coding}")
                 graph = Graph(n=n, k=k, weights=weights, coding=coding)
                 r.append(calculator.calc(graph))
@@ -86,12 +90,13 @@ def _process_worker(calculator, n, k, weights, call_queue, result_queue, max_tas
 
 
 class CalculatorProcessPool(ProcessPoolExecutor):
-    def __init__(self, calculator, n, k, weights, **kwargs):
+    def __init__(self, calculator, n, k, weights, workers_wait_time, **kwargs):
         self.calculator, self.n, self.k, self.weights = calculator, n, k, weights
+        self.workers_wait_time = workers_wait_time
         super().__init__(**kwargs)
 
     def _spawn_process(self):
-        process_worker = partial(_process_worker, self.calculator, self.n, self.k, self.weights)
+        process_worker = partial(_process_worker, self.calculator, self.n, self.k, self.weights, self.workers_wait_time)
         p = self._mp_context.Process(
             target=process_worker,
             args=(self._call_queue,
@@ -134,9 +139,11 @@ def _commit_cached(session, models, cache, codings, start, manager):
 def returner(x):  # TODO: Remove redundant 'returner' func
     return x
 
+
 def _launch_batch(batch, batch_size, codings, mapper, executor, chunksize, batch_progbar):
     codings_batch = codings[batch * batch_size: (batch + 1) * batch_size]
-    new_mapper = executor.map(returner, codings_batch, chunksize=chunksize)  # TODO: Remove redundant call to 'returner' func
+    new_mapper = executor.map(returner, codings_batch,
+                              chunksize=chunksize)  # TODO: Remove redundant call to 'returner' func
     if len(codings_batch) > 0:
         logging.stage(f"        Batch {batch + 1:>6}")
         batch_progbar.update()
@@ -196,36 +203,41 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
         with CalculatorProcessPool(
                 calculator=calculator, n=n, k=k, weights=weights,
                 max_workers=workers,
+                **options
                 # max_tasks_per_child=chunksize * options["batch_chunks"],  # TODO: see if 'max_tasks_per_child' needed
                 # initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
         ) as executor:
-            for pre_batch in range(options["preloaded_batches"]):
-                mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, chunksize,
-                                       batch_progbar)
-            for batch in range(options["preloaded_batches"], batches + options["preloaded_batches"]):
-                mapper = _launch_batch(batch, batch_size, codings, mapper, executor, chunksize,
-                                       batch_progbar)
-                for i in range(batch_size):
-                    try:
-                        cache.append(next(mapper))
-                    except StopIteration:
-                        break
-                    except BrokenProcessPool:
-                        logging.warning(
-                            f"    (batch: {batch}, num: {i})  A process in the process pool was terminated abruptly, trying to restart...")
-                        _commit_cached(session=session, models=models,
-                                       cache=cache, codings=codings,
-                                       start=committed, manager=manager)
-                        batch_progbar.close()
-                        result_progbar.close()
-                        return False
-                    commit_counter += 1
-                    result_progbar.update()
-                    if time.time() > next_commit or commit_counter >= options["max_commit_cache"]:
-                        committed = _commit_cached(session=session, models=models,
-                                                   cache=cache, codings=codings,
-                                                   start=committed, manager=manager)
-                        next_commit, commit_counter, cache = time.time() + options["commit_interval"], 0, list()
+            try:
+                for pre_batch in range(options["preloaded_batches"]):
+                    mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, chunksize,
+                                           batch_progbar)
+                for batch in range(options["preloaded_batches"], batches + options["preloaded_batches"]):
+                    mapper = _launch_batch(batch, batch_size, codings, mapper, executor, chunksize,
+                                           batch_progbar)
+                    for i in range(batch_size):
+                        try:
+                            cache.append(next(mapper))
+                        except StopIteration:
+                            break
+                        except BrokenProcessPool:
+                            logging.warning(
+                                f"    (batch: {batch}, num: {i})  A process in the process pool was terminated abruptly, trying to restart...")
+                            _commit_cached(session=session, models=models,
+                                           cache=cache, codings=codings,
+                                           start=committed, manager=manager)
+                            batch_progbar.close()
+                            result_progbar.close()
+                            return False
+                        commit_counter += 1
+                        result_progbar.update()
+                        if time.time() > next_commit or commit_counter >= options["max_commit_cache"]:
+                            committed = _commit_cached(session=session, models=models,
+                                                       cache=cache, codings=codings,
+                                                       start=committed, manager=manager)
+                            next_commit, commit_counter, cache = time.time() + options["commit_interval"], 0, list()
+            except KeyboardInterrupt:
+                logging.warning(f"    KeyboardInterrupt received")
+                executor.shutdown(wait=False)
             _commit_cached(session=session, models=models,
                            cache=cache, codings=codings,
                            start=committed, manager=manager)

@@ -81,6 +81,8 @@ parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
                     help=f"[PARALL] max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)\n\n")
 parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
                     help=f"[PARALL] approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)\n\n")
+parser.add_argument("--workers_wait_time", type=int, default=var.WORKERS_WAIT_TIME,
+                    help=f"[PARALL] maximum of random wait time at worker initialization  (default: {var.WORKERS_WAIT_TIME}s)\n\n")
 parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
                     help=f"[PARALL] maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})\n\n")
 parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
