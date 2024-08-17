@@ -3,6 +3,7 @@ import os
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ERRORS_DIR = os.path.join(DATA_DIR, 'errors')
+LOGS_DIR = os.path.join(DATA_DIR, 'logs')
 GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
 DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.cgdb")
 RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.json")
@@ -22,9 +23,7 @@ CALC_CERTIFICATE = 'cert'
 CALC_GAP = 'gap'
 
 CPU_COUNT = os.cpu_count()
-MEMORY_ATTR = "rss"
 CHUNKTIME = 1
-WORKERS_WAIT_TIME = 0
 COMMIT_INTERVAL = 60
 MAX_COMMIT_CACHE = 65536
 MAX_CHUNKSIZE = 1000
@@ -40,6 +39,11 @@ EST_CALC_TIME_PARAMS = {
     "cert": (1.93e-04, -0.0884),
     "gap": (7e-9, 2.1)
 }
+
+INITIAL_WAIT = 0
+RESTART_WAIT = 60
+MEMORY_ATTR = "rss"
+RAM_HISTORY_ENTRIES = 100
 
 GUROBI_RESET = 0
 GUROBI_METHOD = 1

@@ -1,6 +1,7 @@
 import multiprocessing
-import os, time, logging
+import os, time, logging, json
 import psutil
+from collections import deque
 
 from modules import var
 from modules import utility as utl
@@ -15,7 +16,7 @@ class WorkerProcess(multiprocessing.Process):
         self.input_queue, self.output_queue = input_queue, output_queue
         self.wait_interval = wait_interval
         self.current_item = multiprocessing.Queue(maxsize=1)
-        self.psutil_proc = None
+        self.psutil_proc, self.ram_history = None, deque(maxlen=var.RAM_HISTORY_ENTRIES)
 
     def set_current_item(self, item=None):
         if item is None:
@@ -32,7 +33,7 @@ class WorkerProcess(multiprocessing.Process):
         self.psutil_proc = psutil.Process(self.pid)
 
     def run(self):
-        time.sleep(self.number * self.wait_interval)
+        time.sleep(self.wait_interval)
         os.nice(var.PROCESSES_NICENESS)
         logging.process(f"                [{self.name} {os.getpid():>6}] START")
         self.calculator.initialize()
@@ -67,13 +68,21 @@ class WorkerProcess(multiprocessing.Process):
         del self.calculator
 
     def get_infos(self):
-        return self.psutil_proc.cpu_percent(), getattr(self.psutil_proc.memory_info(), var.MEMORY_ATTR) / 1073741824
+        cpu = self.psutil_proc.cpu_percent()
+        ram = getattr(self.psutil_proc.memory_info(), var.MEMORY_ATTR) / 1073741824
+        self.ram_history.append(ram)
+        return cpu, ram
+
+    def save_ram_history(self):
+        with open(os.path.join(var.LOGS_DIR, f"ram_{self.name}_{os.getpid()}.json"), 'w') as f:
+            json.dump(tuple(self.ram_history), f, indent=var.RUN_INFO_INDENT)
 
 
 class ProcessPool(object):
-    def __init__(self, calculator, graph_kwargs, max_workers, chunksize, workers_wait_time, **options):
+    def __init__(self, calculator, graph_kwargs, max_workers, chunksize, initial_wait, restart_wait, **options):
         self.calculator, self.graph_kwargs = calculator, graph_kwargs
-        self.max_workers, self.chunksize, self.workers_wait_time = max_workers, chunksize, workers_wait_time
+        self.max_workers, self.chunksize = max_workers, chunksize
+        self.initial_wait, self.restart_wait = initial_wait, restart_wait
         self.input_queue, self.output_queue = multiprocessing.Queue(), multiprocessing.Queue()
         self.processes = []
         self.cache = list()
@@ -99,7 +108,7 @@ class ProcessPool(object):
             process = WorkerProcess(number=i,
                                     calculator=self.calculator, graph_kwargs=self.graph_kwargs,
                                     input_queue=self.input_queue, output_queue=self.output_queue,
-                                    wait_interval=self.workers_wait_time / self.max_workers)
+                                    wait_interval=i * self.initial_wait / self.max_workers)
             process.start()
             self.processes.append(process)
 
@@ -117,15 +126,16 @@ class ProcessPool(object):
     def _check_processes(self, manager):
         for i, process in enumerate(self.processes):
             if not process.is_alive():
-                logging.warning(f"Process {process.name} is dead, trying to restart...")
-                manager.print_status()
+                logging.warning(f"Process {process.name} is dead (pid: {process.pid}), restarting in {self.restart_wait}s...")
                 unfinished = process.get_current_item()
+                process.save_ram_history()
                 if unfinished is not None:
                     self.input_queue.put(unfinished)
                 process.close()
                 process = WorkerProcess(number=i,
                                         calculator=self.calculator, graph_kwargs=self.graph_kwargs,
-                                        input_queue=self.input_queue, output_queue=self.output_queue)
+                                        input_queue=self.input_queue, output_queue=self.output_queue,
+                                        wait_interval=self.restart_wait)
                 process.start()
                 self.processes[i] = process
 

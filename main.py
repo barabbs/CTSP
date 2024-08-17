@@ -81,8 +81,6 @@ parser.add_argument("--workers", type=int, default=var.CPU_COUNT,
                     help=f"[PARALL] max number of processes employed  (default: {var.CPU_COUNT}, # CPUs in machine)\n\n")
 parser.add_argument("--chunktime", type=int, default=var.CHUNKTIME,
                     help=f"[PARALL] approx seconds of calculation per chunk  (default: {var.CHUNKTIME}s)\n\n")
-parser.add_argument("--workers_wait_time", type=int, default=var.WORKERS_WAIT_TIME,
-                    help=f"[PARALL] maximum of random wait time at worker initialization  (default: {var.WORKERS_WAIT_TIME}s)\n\n")
 parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
                     help=f"[PARALL] maximum number of graphs per chunk  (default: {var.MAX_CHUNKSIZE})\n\n")
 parser.add_argument("--min_chunks", type=int, default=var.MIN_CHUNKS,
@@ -107,6 +105,10 @@ parser.add_argument("--gurobi_threads", type=int, default=var.GUROBI_THREADS,
 
 # parser.add_argument("--max_chunksize", type=int, default=var.MAX_CHUNKSIZE,
 #                     help=f"<parallelization> max size of chunk  (default: {var.MAX_CHUNKSIZE})")
+parser.add_argument("--initial_wait", type=int, default=var.INITIAL_WAIT,
+                    help=f"wait time at worker initialization, cumulative time of spawning of all workers (default: {var.INITIAL_WAIT}s)\n\n")
+parser.add_argument("--restart_wait", type=int, default=var.RESTART_WAIT,
+                    help=f"wait time on worker restart after death  (default: {var.RESTART_WAIT}s)\n\n")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
                     help=f"seconds between commits to database  (default: {var.COMMIT_INTERVAL}s)\n\n")
 parser.add_argument("--max_commit_cache", type=int, default=var.MAX_COMMIT_CACHE,
@@ -133,7 +135,6 @@ if __name__ == '__main__':
     options = {"delete": args.delete,
                "workers": args.workers,
                "chunktime": args.chunktime,
-               "workers_wait_time": args.workers_wait_time,
                "max_chunksize": args.max_chunksize,
                "batch_chunks": args.batch_chunks,
                "min_chunks": args.min_chunks,
@@ -146,6 +147,8 @@ if __name__ == '__main__':
                "gurobi_pre_sparsify": args.gurobi_pre_sparsify,
                "gurobi_threads": args.gurobi_threads,
 
+               "initial_wait": args.initial_wait,
+               "restart_wait": args.restart_wait,
                "commit_interval": args.commit_interval,
                "max_commit_cache": args.max_commit_cache,
                "sql_verbose": args.sql_verbose, }

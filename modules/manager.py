@@ -3,16 +3,19 @@ import os, math, time
 
 
 class Manager(enlighten.Manager):
-    PROGRESSBAR_FORMAT = u'     {percentage_2:3.0f}% |{bar}|' + \
-                         u' {count_2:{len_total}d}+{count_1}+{count_0}/{total:d} ' + \
-                         u'[{elapsed}<{eta_2}, {interval_2:.2f}s]'
-    INFOBARS_FORMAT = "{type} {cumulative:5.1f} | {values} |{post}"
-    LOGBAR_FORMAT = "{type:<9} | {value}  {status}"
     INFOBARS = ["CPU", "RAM"]
+
+    def _load_formats(self):
+        self.PROGRESSBAR_FORMAT = u'     {percentage_2:3.0f}% |{bar}|' + \
+                             u' {count_2:{len_total}d}+{count_1}+{count_0}/{total:d} ' + \
+                             u'[{elapsed}<{eta_2}, {interval_2:.2f}s]'
+        self.INFOBARS_FORMAT = "{type} {cumulative:5.1f} | {values} |{post}"
+        self.LOGBAR_FORMAT = self.term.white_on_black("{type:<9}") + " | {value}  {status}"
 
     def __init__(self, total, **kwargs):
         super().__init__(**kwargs)
         # self.committed, self.cached, self.loaded = None, None, None
+        self._load_formats()
         self.total = total
         self.loaded = self.counter(total=total, bar_format=self.PROGRESSBAR_FORMAT,
                                    unit='graphs', color='cyan', leave=False, position=3)
