@@ -105,10 +105,13 @@ BOUND_THRESHOLD = 1e-15
 class GAP_Gurobi_Bound_Base(GAP_Gurobi):
     CALC_TYPE = var.CALC_GAP
 
-    def __init__(self, n, obj_bound=None, **kwargs):
+    def __init__(self, n, obj_bound=None, bound_strict=False, **kwargs):
         self.obj_bound = obj_bound or utl.get_best_gap(n - 1)
         if self.obj_bound is not None:
-            self.obj_bound = (1 / self.obj_bound) - BOUND_THRESHOLD
+            if bound_strict:
+                self.obj_bound = (1 / self.obj_bound) - BOUND_THRESHOLD
+            else:
+                self.obj_bound = (1 / self.obj_bound) + BOUND_THRESHOLD
         self.obj_bound_constr = None
         super().__init__(n=n, **kwargs)
 

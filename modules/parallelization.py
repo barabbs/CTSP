@@ -1,21 +1,15 @@
-import random
+import math
+import signal
 
-from modules.models import get_models, GRAPH, TIMINGS, GAP_INFO
-from modules.graph import Graph
-from modules.combinatorics import full_codings_generator
-from modules import var
+from modules.models import GRAPH, TIMINGS, GAP_INFO
 from modules import utility as utl
+from modules.process_pool import ProcessPool
 
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool, _ExceptionWithTraceback, _sendback_result
-from functools import partial
-from itertools import chain
 import os, logging
 import time
 import numpy as np
-from modules.calculations import GAP
 
-from sqlalchemy import create_engine, select, insert, update, bindparam, and_
+from sqlalchemy import select, insert, update, bindparam, and_
 from sqlalchemy.orm import Session, aliased
 import enlighten
 
@@ -27,218 +21,183 @@ COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
                 GAP_INFO: COMMIT_INSERT}
 
 
-def _process_worker(calculator, n, k, weights, workers_wait_time, call_queue, result_queue, max_tasks=None):
-    """Evaluates calls from call_queue and places the results in result_queue.
+class Manager(enlighten.Manager):
+    PROGRESSBAR_FORMAT = u'     {percentage_2:3.0f}% |{bar}|' + \
+                         u' {count_2:{len_total}d}+{count_1}+{count_0}/{total:d} ' + \
+                         u'[{elapsed}<{eta_2}, {interval_1:.2f}s]'
+    INFOBARS_FORMAT = "{type} {cumulative:5.1f} | {values} |{post}"
+    LOGBAR_FORMAT = "{type:<9} | {value}  {status}"
+    INFOBARS = ["CPU", "RAM"]
 
-    This worker is run in a separate process.
-
-    Args:
-        call_queue: A ctx.Queue of _CallItems that will be read and
-            evaluated by the worker.
-        result_queue: A ctx.Queue of _ResultItems that will be written
-            to by the worker.
-    """
-    time.sleep(random.random() * workers_wait_time)
-    logging.process(f"                [{os.getpid() - os.getppid():>4}] START")
-    # Initialization
-    os.nice(var.PROCESSES_NICENESS)
-    calculator.initialize()
-
-    num_tasks = 0
-    processed_items = 0
-    exit_pid = None
-    while True:
-        call_item = call_queue.get(block=True)
-        if call_item is None:
-            # Wake up queue management thread
-            result_queue.put(os.getpid())
-            calculator.close()
-            logging.process(f"                [{os.getpid() - os.getppid():>4}] END   ({processed_items} processed)")
-            return
-
-        if max_tasks is not None:
-            num_tasks += 1
-            if num_tasks >= max_tasks:
-                exit_pid = os.getpid()
-
-        try:
-            r = list()
-            for coding in call_item.fn(*call_item.args,
-                                       **call_item.kwargs):  # TODO: Remove redundant call to 'returner' func
-                # print(f"{os.getpid() - os.getppid():<4} - {coding}")
-                graph = Graph(n=n, k=k, weights=weights, coding=coding)
-                r.append(calculator.calc(graph))
-                del graph
-                processed_items += 1
-        except BaseException as e:
-            exc = _ExceptionWithTraceback(e, e.__traceback__)
-            _sendback_result(result_queue, call_item.work_id, exception=exc,
-                             exit_pid=exit_pid)
-        else:
-            _sendback_result(result_queue, call_item.work_id, result=r,
-                             exit_pid=exit_pid)
-            del r
-
-        # Liberate the resource as soon as possible, to avoid holding onto
-        # open files or shared memory that is not needed anymore
-        del call_item
-
-        if exit_pid is not None:
-            calculator.close()
-            logging.process(f"                [{os.getpid() - os.getppid():>4}] EXIT  ({processed_items} processed)")
-            return
-
-
-class CalculatorProcessPool(ProcessPoolExecutor):
-    def __init__(self, calculator, n, k, weights, workers_wait_time, **kwargs):
-        self.calculator, self.n, self.k, self.weights = calculator, n, k, weights
-        self.workers_wait_time = workers_wait_time
+    def __init__(self, total, **kwargs):
         super().__init__(**kwargs)
+        # self.committed, self.cached, self.loaded = None, None, None
+        self.total = total
+        self.loaded = self.counter(total=total, bar_format=self.PROGRESSBAR_FORMAT,
+                                   unit='graphs', color='cyan', leave=False, position=3)
+        self.cached = self.loaded.add_subcounter('blue', all_fields=True)
+        self.committed = self.loaded.add_subcounter('white', all_fields=True)
 
-    def _spawn_process(self):
-        process_worker = partial(_process_worker, self.calculator, self.n, self.k, self.weights, self.workers_wait_time)
-        p = self._mp_context.Process(
-            target=process_worker,
-            args=(self._call_queue,
-                  self._result_queue,
-                  self._max_tasks_per_child))
-        p.start()
-        self._processes[p.pid] = p
+        self.infobars = dict((info, self.status_bar(status_format=self.INFOBARS_FORMAT,
+                                                    type=info, cumulative=0, values="", post="",
+                                                    poisition=i + 1, leave=False)) for i, info in
+                             enumerate(self.INFOBARS))
+        self.curr_info = 0
+        self.logbar = self.status_bar(status_format=self.LOGBAR_FORMAT, type="", value="", status="", position=4,
+                                      leave=False)
+
+    def update(self, executor):
+        infos, cumulatives = executor.get_infos()
+        max_vals = (os.get_terminal_size().columns - 20) // 6
+        values = (
+            "  ".join(
+                f"{int(s):>4}" for s in infos[0][self.curr_info * max_vals:(self.curr_info + 1) * max_vals]),
+            "  ".join(f"{s:>4.1f}" for s in infos[1][self.curr_info * max_vals:(self.curr_info + 1) * max_vals]),
+        )
+        posts = (f" page {self.curr_info + 1}",
+                 f"{self.curr_info * max_vals:3}-{min(len(infos[0]), (self.curr_info + 1) * max_vals) - 1:3}")
+        for infobar, cumul, val, post in zip(self.infobars.values(), cumulatives, values, posts):
+            infobar.update(cumulative=cumul, values=val, post=post)
+        self.curr_info = (self.curr_info + 1) % math.ceil(len(infos[0]) / max_vals)
+
+    def add_log(self, type="", value="", status=""):
+        self.logbar.update(type=type, value=value, status=status)
+
+    def change_log_status(self, status):
+        self.logbar.update(status=status)
+
+    def update_loaded(self, num=1):
+        return self.loaded.update(num)
+
+    def update_cached(self, num=1):
+        return self.cached.update_from(self.loaded, num)
+
+    def update_committed(self, num=1):
+        return self.committed.update_from(self.cached, num)
+
+    def print_status(self):
+        for infobar in self.infobars.values():
+            print(infobar)
+
+    def finished(self):
+        return self.cached.count + self.committed.count == self.total
+
+    def stop(self):
+        self.loaded.close()
+        for infobar in self.infobars.values():
+            infobar.close()
+        self.logbar.close()
+        super().stop()
 
 
-def _commit_cached(session, models, cache, codings, start, manager):
-    try:
-        m_names = cache[0].keys()
-    except IndexError:
-        logging.trace(f"    Nothing to commit")
-        return start
+def _commit_cached(session, models, executor, manager):
+    cache = executor.get_cache()
     total = len(cache)
-    end = start + total
-    logging.stage(f"            committing {total} results ({start} --> {end - 1})")
-    commit_progbar = manager.counter(total=len(m_names), desc='Commit', leave=False)
-    for mod in m_names:
+    if total == 0:
+        manager.add_log(type="COMMIT", value="Nothing to commit")
+        logging.stage(f"    Nothing to commit")
+        return
+    manager.add_log(type="COMMIT", value=f"Committing {total} results...")
+    logging.stage(f"            Committing {total} results")
+    for mod in cache[0][1].keys():
         session.execute(COMMIT_TYPES[mod](models[mod]),
-                        tuple(dict(id=codings[start + i], **result[mod]) for i, result in enumerate(cache)))
-        commit_progbar.update()
+                        tuple(dict(id=coding, **result[mod]) for coding, result in cache))
     session.commit()
-    commit_progbar.close()
-    return end
+    manager.update_committed(total)
+    manager.change_log_status(status="DONE")
 
 
-# def _calc_helper(calculator, n, k, weights, coding):
-#     # logging.stage(f"            {os.getpid():>8}({os.getpid() - os.getppid():<4})  {num:>8}  {calc_type.upper():<10} {coding}")
-#     print(f"{os.getpid() - os.getppid():<4} - {coding}")
-#     # calculator.initialize()
-#     graph = Graph(n=n, k=k, weights=weights, coding=coding)
-#     return calculator.calc(graph)
-#     # calc = graph.calculate(calc_type)
-#     # del graph
-#     # gc.collect()
-#     # return calc
-
-def returner(x):  # TODO: Remove redundant 'returner' func
-    return x
+def _launch_batch(codings_gen, executor, manager):
+    try:
+        codings_batch = next(codings_gen)
+    except StopIteration:
+        return
+    executor.submit(codings_batch)
+    manager.update_loaded(len(codings_batch))
 
 
-def _launch_batch(batch, batch_size, codings, mapper, executor, chunksize, batch_progbar):
-    codings_batch = codings[batch * batch_size: (batch + 1) * batch_size]
-    new_mapper = executor.map(returner, codings_batch,
-                              chunksize=chunksize)  # TODO: Remove redundant call to 'returner' func
-    if len(codings_batch) > 0:
-        logging.stage(f"        Batch {batch + 1:>6}")
-        batch_progbar.update()
-    return chain(mapper, new_mapper)
+def _get_statement(session, models, where, group_by):
+    where_smnt = tuple(getattr(models[GRAPH], attr).is_(val) for attr, val in where.items())
+
+    if group_by is None:
+        count_stmnt = session.query(models[GRAPH]).where(*where_smnt)
+    else:
+        graph_alias = aliased(models[GRAPH], name="graph_max")
+        count_stmnt = session.query(models[GRAPH]).join(
+            graph_alias,
+            and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
+                 models[GRAPH].coding > graph_alias.coding),
+            isouter=True
+        ).where(graph_alias.coding.is_(None), *where_smnt)
+
+    tot = count_stmnt.count()
+    if tot == 0:
+        return tot, None
+
+    if group_by is None:
+        statement = select(models[GRAPH].coding).where(
+            *where_smnt)  # .group_by(group_by_smnt)  # .order_by(None if group_by is None else models[GRAPH].coding)
+    else:
+        graph_alias = aliased(models[GRAPH], name="graph_max")
+        statement = select(models[GRAPH].coding).join(
+            graph_alias,
+            and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
+                 models[GRAPH].coding > graph_alias.coding),
+            isouter=True
+        ).where(graph_alias.coding.is_(None), *where_smnt)
+
+    return tot, statement
+
+
+def handler(sig, frame):
+    raise StopIteration
 
 
 def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers, where=None, group_by=None,
                  **options):  # TODO: Sistemare questo schifo immondo.
-    manager = enlighten.get_manager()
     with Session(engine) as session:
-        where_smnt = tuple(getattr(models[GRAPH], attr).is_(val) for attr, val in where.items())
-
-        if group_by is None:
-            tot = session.query(models[GRAPH]).where(*where_smnt).count()
-        else:
-            graph_alias = aliased(models[GRAPH], name="graph_max")
-            tot = session.query(models[GRAPH]).join(
-                graph_alias,
-                and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
-                     models[GRAPH].coding > graph_alias.coding),
-                isouter=True
-            ).where(graph_alias.coding.is_(None), *where_smnt).count()
-
+        tot, statement = _get_statement(session, models, where, group_by)
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return True
-        chunksize = utl.calc_chunksize(n, calc_type, tot, workers=workers, **options)
 
+        manager = Manager(total=tot)
+
+        chunksize = utl.calc_chunksize(n, calc_type, tot, workers=workers, **options)
         batch_size = chunksize * options["batch_chunks"] * workers
         batches = int(np.ceil(tot / batch_size))
 
-        batch_progbar = manager.counter(total=batches, desc=f"Batch ", leave=False)
-        result_progbar = manager.counter(total=tot, desc=f"Result", leave=False)
-
         logging.trace(f"    Total {tot:>8}    (chunksize {chunksize} / {batches} batches of {batch_size})")
 
-        if group_by is None:
-            statement = select(models[GRAPH].coding).where(
-                *where_smnt)  # .group_by(group_by_smnt)  # .order_by(None if group_by is None else models[GRAPH].coding)
-        else:
-            graph_alias = aliased(models[GRAPH], name="graph_max")
-            statement = select(models[GRAPH].coding).join(
-                graph_alias,
-                and_(getattr(models[GRAPH], group_by) == getattr(graph_alias, group_by),
-                     models[GRAPH].coding > graph_alias.coding),
-                isouter=True
-            ).where(graph_alias.coding.is_(None), *where_smnt)
-        # codings_gen = session.scalars(statement).partitions(size=batch_size)
-        codings = session.scalars(statement).all()
+        codings_gen = session.scalars(statement).partitions(size=batch_size)
         calculator = calculators.get_calculation(calc_type, n=n, k=k, weights=weights, **options)
-        # calc_func = partial(_calc_helper, calculator, n, k, weights)
 
-        next_commit, commit_counter, cache, committed = time.time() + options["commit_interval"], 0, list(), 0
-        mapper = tuple()
-        with CalculatorProcessPool(
-                calculator=calculator, n=n, k=k, weights=weights,
-                workers_wait_time=options["workers_wait_time"], max_workers=workers,
-                # max_tasks_per_child=chunksize * options["batch_chunks"],  # TODO: see if 'max_tasks_per_child' needed
-                # initializer=os.nice, initargs=(var.PROCESSES_NICENESS,),
+        next_commit = time.time() + options["commit_interval"]
+
+        with ProcessPool(
+                calculator=calculator, graph_kwargs=dict(n=n, k=k, weights=weights),
+                max_workers=workers, chunksize=chunksize, **options
         ) as executor:
+            signal.signal(signal.SIGINT, handler)
             try:
                 for pre_batch in range(options["preloaded_batches"]):
-                    mapper = _launch_batch(pre_batch, batch_size, codings, mapper, executor, chunksize,
-                                           batch_progbar)
-                for batch in range(options["preloaded_batches"], batches + options["preloaded_batches"]):
-                    mapper = _launch_batch(batch, batch_size, codings, mapper, executor, chunksize,
-                                           batch_progbar)
-                    for i in range(batch_size):
-                        try:
-                            cache.append(next(mapper))
-                        except StopIteration:
-                            break
-                        except BrokenProcessPool:
-                            logging.warning(
-                                f"    (batch: {batch}, num: {i})  A process in the process pool was terminated abruptly, trying to restart...")
-                            _commit_cached(session=session, models=models,
-                                           cache=cache, codings=codings,
-                                           start=committed, manager=manager)
-                            batch_progbar.close()
-                            result_progbar.close()
-                            return False
-                        commit_counter += 1
-                        result_progbar.update()
-                        if time.time() > next_commit or commit_counter >= options["max_commit_cache"]:
-                            committed = _commit_cached(session=session, models=models,
-                                                       cache=cache, codings=codings,
-                                                       start=committed, manager=manager)
-                            next_commit, commit_counter, cache = time.time() + options["commit_interval"], 0, list()
-            except KeyboardInterrupt:
+                    _launch_batch(codings_gen, executor, manager)
+                while True:
+                    start_time = time.time()
+                    manager.update(executor)
+                    if manager.loaded.count <= options["preloaded_batches"] * batch_size:
+                        _launch_batch(codings_gen, executor, manager)
+                    cache_length = executor.update(manager)
+                    if time.time() > next_commit or cache_length >= options["max_commit_cache"]:
+                        _commit_cached(session=session, models=models, executor=executor, manager=manager)
+                        next_commit, time.time() + options["commit_interval"]
+                    if manager.finished():
+                        break
+                    time.sleep(max(0, 1 - (time.time() - start_time)))
+            except StopIteration:
                 logging.warning(f"    KeyboardInterrupt received")
-                executor.shutdown(wait=False, cancel_futures=True)
-            _commit_cached(session=session, models=models,
-                           cache=cache, codings=codings,
-                           start=committed, manager=manager)
-    batch_progbar.close()
-    result_progbar.close()
+            finally:
+                _commit_cached(session=session, models=models, executor=executor, manager=manager)
+                signal.signal(signal.SIGINT, signal.SIG_DFL)
     manager.stop()
     return True

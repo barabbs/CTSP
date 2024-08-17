@@ -2,11 +2,13 @@ import os
 
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
+ERRORS_DIR = os.path.join(DATA_DIR, 'errors')
 GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
 DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.cgdb")
 RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.json")
 BEST_GAPS_FILEPATH = os.path.join(DATA_DIR, "best_gaps.json")
 RUN_INFO_INDENT = 4
+DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 # Table names
 GRAPH_TABLE = 'graphs'
@@ -20,6 +22,7 @@ CALC_CERTIFICATE = 'cert'
 CALC_GAP = 'gap'
 
 CPU_COUNT = os.cpu_count()
+MEMORY_ATTR = "rss"
 CHUNKTIME = 1
 WORKERS_WAIT_TIME = 0
 COMMIT_INTERVAL = 60

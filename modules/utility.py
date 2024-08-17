@@ -1,6 +1,7 @@
 import networkx as nx
 from networkx.algorithms.connectivity import minimum_st_edge_cut
-import pynauty
+import traceback
+import datetime as dt
 import json, os, time, logging
 from modules import var
 import numpy as np
@@ -150,3 +151,13 @@ def get_best_gap(n):
     with open(var.BEST_GAPS_FILEPATH, 'r') as f:
         gaps = json.load(f)
     return gaps.get(str(n), None)
+
+
+def log_error(error, **kwargs):
+    time_str = dt.datetime.now().strftime(var.DATETIME_FORMAT)
+    header = f"time={time_str}"
+    for k in kwargs:
+        header += f"\n{k}={kwargs[k]}"
+    error_str = ''.join(traceback.format_exception(None, error, error.__traceback__))
+    with open(os.path.join(var.ERRORS_DIR, f"{time_str}.err"), 'w', encoding='utf-8') as f:
+        f.write(f"{header}\n--------------------------------\n{error_str}")
