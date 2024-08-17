@@ -146,7 +146,7 @@ class ProcessPool(object):
 
     def get_infos(self):
         infos = tuple(zip(*(proc.get_infos() for proc in self.processes)))
-        cumulatives = ((sum(infos[0]) + self.psutil_proc.cpu_percent()) / 100,
+        cumulatives = ((sum(infos[0]) + self.psutil_proc.cpu_percent()),
                        sum(getattr(p.memory_info(), var.MEMORY_ATTR) for p in
                            (self.psutil_proc, *self.psutil_proc.children(recursive=True))) / 1073741824)
         return infos, cumulatives
