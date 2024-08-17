@@ -1,4 +1,4 @@
-import os
+import os, psutil
 
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -42,6 +42,7 @@ EST_CALC_TIME_PARAMS = {
 
 INITIAL_WAIT = 0
 RESTART_WAIT = 60
+TOTAL_RAM = psutil.virtual_memory().total / 1073741824
 MEMORY_ATTR = "rss"
 RAM_HISTORY_ENTRIES = 100
 

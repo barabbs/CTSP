@@ -38,7 +38,8 @@ def _commit_cached(session, models, executor, manager):
 
 
 def _launch_batch(codings_gen, executor, manager, batch_n, batches):
-    manager.add_log(type="LOADING", value=f"Loading batch {batch_n + 1:3}/{batches:3}...")
+    if batch_n < batches:
+        manager.add_log(type="LOADING", value=f"Loading batch {batch_n + 1:3}/{batches:3}...")
     try:
         codings_batch = next(codings_gen)
     except StopIteration:
