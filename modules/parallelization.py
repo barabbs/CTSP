@@ -103,17 +103,21 @@ def _commit_cached(session, models, executor, manager):
         session.execute(COMMIT_TYPES[mod](models[mod]),
                         tuple(dict(id=coding, **result[mod]) for coding, result in cache))
     session.commit()
+    del cache
     manager.update_committed(total)
     manager.change_log_status(status="DONE")
 
 
-def _launch_batch(codings_gen, executor, manager):
+def _launch_batch(codings_gen, executor, manager, batch_n, batches):
+    manager.add_log(type="LOADING", value=f"Loading batch {batch_n:3}/{batches:3}...")
     try:
         codings_batch = next(codings_gen)
     except StopIteration:
-        return
+        return batch_n
     executor.submit(codings_batch)
     manager.update_loaded(len(codings_batch))
+    manager.change_log_status(status="DONE")
+    return batch_n + 1
 
 
 def _get_statement(session, models, where, group_by):
@@ -172,6 +176,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
         codings_gen = session.scalars(statement).partitions(size=batch_size)
         calculator = calculators.get_calculation(calc_type, n=n, k=k, weights=weights, **options)
 
+        batch_n = 0
         next_commit = time.time() + options["commit_interval"]
 
         with ProcessPool(
@@ -181,16 +186,16 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
             signal.signal(signal.SIGINT, handler)
             try:
                 for pre_batch in range(options["preloaded_batches"]):
-                    _launch_batch(codings_gen, executor, manager)
+                    batch_n = _launch_batch(codings_gen, executor, manager, batch_n, batches)
                 while True:
                     start_time = time.time()
                     manager.update(executor)
                     if manager.loaded.count <= options["preloaded_batches"] * batch_size:
-                        _launch_batch(codings_gen, executor, manager)
+                        batch_n = _launch_batch(codings_gen, executor, manager, batch_n, batches)
                     cache_length = executor.update(manager)
                     if time.time() > next_commit or cache_length >= options["max_commit_cache"]:
                         _commit_cached(session=session, models=models, executor=executor, manager=manager)
-                        next_commit, time.time() + options["commit_interval"]
+                        next_commit = time.time() + options["commit_interval"]
                     if manager.finished():
                         break
                     time.sleep(max(0, 1 - (time.time() - start_time)))
