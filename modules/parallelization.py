@@ -24,7 +24,7 @@ COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
 class Manager(enlighten.Manager):
     PROGRESSBAR_FORMAT = u'     {percentage_2:3.0f}% |{bar}|' + \
                          u' {count_2:{len_total}d}+{count_1}+{count_0}/{total:d} ' + \
-                         u'[{elapsed}<{eta_2}, {interval_1:.2f}s]'
+                         u'[{elapsed}<{eta_2}, {interval_2:.2f}s]'
     INFOBARS_FORMAT = "{type} {cumulative:5.1f} | {values} |{post}"
     LOGBAR_FORMAT = "{type:<9} | {value}  {status}"
     INFOBARS = ["CPU", "RAM"]
@@ -59,6 +59,7 @@ class Manager(enlighten.Manager):
         for infobar, cumul, val, post in zip(self.infobars.values(), cumulatives, values, posts):
             infobar.update(cumulative=cumul, values=val, post=post)
         self.curr_info = (self.curr_info + 1) % math.ceil(len(infos[0]) / max_vals)
+        self.loaded.refresh()
 
     def add_log(self, type="", value="", status=""):
         self.logbar.update(type=type, value=value, status=status)
@@ -70,6 +71,8 @@ class Manager(enlighten.Manager):
         return self.loaded.update(num)
 
     def update_cached(self, num=1):
+        if self.cached.count == 0:
+            self.loaded.start = time.time()
         return self.cached.update_from(self.loaded, num)
 
     def update_committed(self, num=1):
@@ -109,7 +112,7 @@ def _commit_cached(session, models, executor, manager):
 
 
 def _launch_batch(codings_gen, executor, manager, batch_n, batches):
-    manager.add_log(type="LOADING", value=f"Loading batch {batch_n:3}/{batches:3}...")
+    manager.add_log(type="LOADING", value=f"Loading batch {batch_n+1:3}/{batches:3}...")
     try:
         codings_batch = next(codings_gen)
     except StopIteration:
