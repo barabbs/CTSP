@@ -8,10 +8,12 @@ from modules.graph import Graph
 
 
 class WorkerProcess(multiprocessing.Process):
-    def __init__(self, number, calculator, graph_kwargs, input_queue, output_queue):
+    def __init__(self, number, calculator, graph_kwargs, input_queue, output_queue, wait_interval=0):
         super().__init__(name=f"worker_{number:03}", daemon=True)
+        self.number = number
         self.calculator, self.graph_kwargs = calculator, graph_kwargs
         self.input_queue, self.output_queue = input_queue, output_queue
+        self.wait_interval = wait_interval
         self.current_item = multiprocessing.Queue(maxsize=1)
         self.psutil_proc = None
 
@@ -30,8 +32,9 @@ class WorkerProcess(multiprocessing.Process):
         self.psutil_proc = psutil.Process(self.pid)
 
     def run(self):
-        logging.process(f"                [{self.name} {os.getpid():>6}] START")
+        time.sleep(self.number * self.wait_interval)
         os.nice(var.PROCESSES_NICENESS)
+        logging.process(f"                [{self.name} {os.getpid():>6}] START")
         self.calculator.initialize()
 
         processed_items = 0
@@ -93,10 +96,10 @@ class ProcessPool(object):
 
     def start(self):
         for i in range(self.max_workers):
-            time.sleep(self.workers_wait_time / self.max_workers)
             process = WorkerProcess(number=i,
                                     calculator=self.calculator, graph_kwargs=self.graph_kwargs,
-                                    input_queue=self.input_queue, output_queue=self.output_queue)
+                                    input_queue=self.input_queue, output_queue=self.output_queue,
+                                    wait_interval=self.workers_wait_time / self.max_workers)
             process.start()
             self.processes.append(process)
 
