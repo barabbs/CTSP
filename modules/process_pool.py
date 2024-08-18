@@ -141,12 +141,12 @@ class ProcessPool(object):
                 process.save_ram_history()
                 if unfinished is not None:
                     self.input_queue.put(unfinished)
-                process.close()
                 try:
                     os.kill(process.pid, signal.SIGKILL)
                     logging.warning(f"Process with pid {process.pid} killed")
                 except ProcessLookupError:
                     pass
+                process.close()
                 del process
                 process = WorkerProcess(number=i,
                                         calculator=self.calculator, graph_kwargs=self.graph_kwargs,
