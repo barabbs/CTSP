@@ -9,16 +9,18 @@ from modules import var
 from modules import utility as utl
 from modules.graph import Graph
 
+
 class CloseProcessPool(BaseException):
     pass
 
+
 class WorkerProcess(multiprocessing.Process):
-    def __init__(self, number, calculator, graph_kwargs, input_queue, output_queue, wait_interval=0):
+    def __init__(self, number, calculator, graph_kwargs, input_queue, output_queue, wait_interval=0, debug_memory=True):
         super().__init__(name=f"worker_{number:03}", daemon=True)
         self.number = number
         self.calculator, self.graph_kwargs = calculator, graph_kwargs
         self.input_queue, self.output_queue = input_queue, output_queue
-        self.wait_interval = wait_interval
+        self.wait_interval, self.debug_memory = wait_interval, debug_memory
         self.current_item = multiprocessing.Queue(maxsize=1)
         self.psutil_proc, self.ram_history = None, deque(maxlen=var.RAM_HISTORY_ENTRIES)
 
@@ -58,7 +60,6 @@ class WorkerProcess(multiprocessing.Process):
                                    self.calculator.calc(Graph(**self.graph_kwargs, coding=coding))
                                ) for coding in codings)
                 self.output_queue.put(results)
-
                 processed_items += len(codings)
             except CloseProcessPool:
                 logging.warning(f"                [{self.name} {os.getpid():>6}] INTERRUPT")
@@ -73,6 +74,8 @@ class WorkerProcess(multiprocessing.Process):
             else:
                 del codings, results
                 self.set_current_item()
+                if self.debug_memory:
+                    utl.save_memory_summary(f"summary_{self.name}_{os.getpid()}.txt", processed_items)
         self.calculator.close()
         logging.process(f"                [{self.name} {os.getpid():>6}] END  ({processed_items} processed)")
         del self.calculator
@@ -89,10 +92,11 @@ class WorkerProcess(multiprocessing.Process):
 
 
 class ProcessPool(object):
-    def __init__(self, calculator, graph_kwargs, max_workers, chunksize, initial_wait, restart_wait, **options):
+    def __init__(self, calculator, graph_kwargs, max_workers, chunksize, initial_wait, restart_wait, debug_memory,
+                 **options):
         self.calculator, self.graph_kwargs = calculator, graph_kwargs
         self.max_workers, self.chunksize = max_workers, chunksize
-        self.initial_wait, self.restart_wait = initial_wait, restart_wait
+        self.initial_wait, self.restart_wait, self.debug_memory = initial_wait, restart_wait, debug_memory
         self.input_queue, self.output_queue = multiprocessing.Queue(), multiprocessing.Queue()
         self.processes = []
         self.cache = list()
@@ -118,7 +122,8 @@ class ProcessPool(object):
             process = WorkerProcess(number=i,
                                     calculator=self.calculator, graph_kwargs=self.graph_kwargs,
                                     input_queue=self.input_queue, output_queue=self.output_queue,
-                                    wait_interval=i * self.initial_wait / self.max_workers)
+                                    wait_interval=i * self.initial_wait / self.max_workers,
+                                    debug_memory=self.debug_memory)
             process.start()
             self.processes.append(process)
 
@@ -136,8 +141,9 @@ class ProcessPool(object):
     def _check_processes(self, manager):
         for i, process in enumerate(self.processes):
             if not process.is_alive():
-                logging.warning(f"Process {process.name} is dead (pid: {process.pid}, exitcode: {process.exitcode}), restarting in {self.restart_wait}s...")
                 unfinished = process.get_current_item()
+                logging.warning(
+                    f"{process.name} dead (pid: {process.pid}, exitcode: {process.exitcode}, unfinished: {unfinished}), restart in {self.restart_wait}s...")
                 process.save_ram_history()
                 if unfinished is not None:
                     self.input_queue.put(unfinished)
@@ -151,7 +157,8 @@ class ProcessPool(object):
                 process = WorkerProcess(number=i,
                                         calculator=self.calculator, graph_kwargs=self.graph_kwargs,
                                         input_queue=self.input_queue, output_queue=self.output_queue,
-                                        wait_interval=self.restart_wait)
+                                        wait_interval=self.restart_wait,
+                                        debug_memory=self.debug_memory)
                 process.start()
                 self.processes[i] = process
                 gc.collect()

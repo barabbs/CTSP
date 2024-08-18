@@ -109,6 +109,8 @@ parser.add_argument("--initial_wait", type=int, default=var.INITIAL_WAIT,
                     help=f"wait time at worker initialization, cumulative time of spawning of all workers (default: {var.INITIAL_WAIT}s)\n\n")
 parser.add_argument("--restart_wait", type=int, default=var.RESTART_WAIT,
                     help=f"wait time on worker restart after death  (default: {var.RESTART_WAIT}s)\n\n")
+parser.add_argument("--debug_memory", action="store_true",
+                    help=f"keeps logs of memory in child processes\n\n")
 parser.add_argument("--commit_interval", type=int, default=var.COMMIT_INTERVAL,
                     help=f"seconds between commits to database  (default: {var.COMMIT_INTERVAL}s)\n\n")
 parser.add_argument("--max_commit_cache", type=int, default=var.MAX_COMMIT_CACHE,
@@ -149,6 +151,7 @@ if __name__ == '__main__':
 
                "initial_wait": args.initial_wait,
                "restart_wait": args.restart_wait,
+               "debug_memory": args.debug_memory,
                "commit_interval": args.commit_interval,
                "max_commit_cache": args.max_commit_cache,
                "sql_verbose": args.sql_verbose, }

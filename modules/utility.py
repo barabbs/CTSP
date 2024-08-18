@@ -1,6 +1,6 @@
 import networkx as nx
-from networkx.algorithms.connectivity import minimum_st_edge_cut
-import traceback
+# from networkx.algorithms.connectivity import minimum_st_edge_cut
+import traceback, guppy
 import datetime as dt
 import json, os, time, logging
 from modules import var
@@ -161,3 +161,10 @@ def log_error(error, **kwargs):
     error_str = ''.join(traceback.format_exception(None, error, error.__traceback__))
     with open(os.path.join(var.ERRORS_DIR, f"{time_str}.err"), 'w', encoding='utf-8') as f:
         f.write(f"{header}\n--------------------------------\n{error_str}")
+
+
+def save_memory_summary(filename, item_n):
+    h = guppy.hpy()
+    heap_info = h.heap()
+    with open(os.path.join(var.LOGS_DIR, filename), 'a') as f:
+        f.write(f"{item_n}\n\n{heap_info}\n\n")
