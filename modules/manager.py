@@ -33,17 +33,17 @@ class Manager(enlighten.Manager):
                                   '/{total:d} ' + u'[{elapsed}<{eta_2}, {interval_2:.2f}s]'
         self.INFOBARS_FORMAT = self.term.black_on_white("{type}") + " {cumulative}|{values}|{post}"
         self.LOGBAR_FORMAT = self.term.black_on_white(
-            "{type:<18}") + "|{value:<32}  {status:<4}" + " "*64 + "({children:>2} children)"
+            "{type:<18}") + "|{value:<32}  {status:<4}" + "{filler}" + "({children:>3} children)"
 
     def __init__(self, total, **kwargs):
         super().__init__(**kwargs)
         # self.committed, self.cached, self.loaded = None, None, None
         self._load_formats()
         self.total = total
-        self.loaded = self.counter(total=total, bar_format=self.PROGRESSBAR_FORMAT,
-                                   unit='graphs', color='cyan', leave=False, position=3)
-        self.cached = self.loaded.add_subcounter('blue', all_fields=True)
-        self.committed = self.loaded.add_subcounter('white', all_fields=True)
+        self.progbar = self.counter(total=total, bar_format=self.PROGRESSBAR_FORMAT,
+                                    unit='graphs', color='cyan', leave=False, position=3)
+        self.cached = self.progbar.add_subcounter('blue', all_fields=True)
+        self.committed = self.progbar.add_subcounter('white', all_fields=True)
 
         self.infobars = dict((info, self.status_bar(status_format=self.INFOBARS_FORMAT,
                                                     type=info, cumulative=0, values="", post="",
@@ -51,7 +51,12 @@ class Manager(enlighten.Manager):
                              enumerate(self.INFOBARS))
         self.curr_info = 0
         self.logbar = self.status_bar(status_format=self.LOGBAR_FORMAT, type="", value="", status="", children=0,
+                                      filler="",
                                       position=4, leave=False)
+        self._update_logbar_filler()
+
+    def _update_logbar_filler(self):
+        self.logbar.update(filler=" " * max(0, os.get_terminal_size().columns - 71))
 
     def update(self, executor):
         infos, cumul_vals = executor.get_infos()
@@ -72,7 +77,8 @@ class Manager(enlighten.Manager):
             infobar.update(cumulative=cumul, values=val, post=post)
         self.curr_info = (self.curr_info + 1) % max_pag
         self.logbar.update(children=len(psutil.Process().children(recursive=True)))
-        self.loaded.refresh()
+        self._update_logbar_filler()
+        self.progbar.refresh()
 
     def add_log(self, type="", value="", status=""):
         self.logbar.update(type=type, value=value, status=status)
@@ -81,15 +87,18 @@ class Manager(enlighten.Manager):
         self.logbar.update(status=status)
 
     def update_loaded(self, num=1):
-        return self.loaded.update(num)
+        return self.progbar.update(num)
 
     def update_cached(self, num=1):
         if self.committed.count == 0:
-            self.loaded.start = time.time()
-        return self.cached.update_from(self.loaded, num)
+            self.progbar.start = time.time()
+        return self.cached.update_from(self.progbar, num)
 
     def update_committed(self, num=1):
         return self.committed.update_from(self.cached, num)
+
+    def get_loaded_count(self):
+        return self.progbar.count - self.progbar.subcount
 
     def print_status(self):
         for infobar in self.infobars.values():
@@ -99,7 +108,7 @@ class Manager(enlighten.Manager):
         return self.cached.count + self.committed.count == self.total
 
     def stop(self):
-        self.loaded.close()
+        self.progbar.close()
         for infobar in self.infobars.values():
             infobar.close()
         self.logbar.close()

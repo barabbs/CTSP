@@ -110,6 +110,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
 
         batch_n = 0
         next_commit = time.time() + options["commit_interval"]
+        return_val = True
 
         with ProcessPool(
                 calculator=calculator, graph_kwargs=dict(n=n, k=k, weights=weights),
@@ -120,9 +121,10 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
                 for pre_batch in range(options["preloaded_batches"]):
                     batch_n = _launch_batch(codings_gen, executor, manager, batch_n, batches)
                 while True:
+                    print(manager.get_loaded_count())
                     start_time = time.time()
                     manager.update(executor)
-                    if manager.loaded.count <= options["preloaded_batches"] * batch_size:
+                    if manager.get_loaded_count() <= options["preloaded_batches"] * batch_size:
                         batch_n = _launch_batch(codings_gen, executor, manager, batch_n, batches)
                     cache_length = executor.update(manager)
                     if time.time() > next_commit or cache_length >= options["max_commit_cache"]:
@@ -133,8 +135,9 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
                     time.sleep(max(0, 1 - (time.time() - start_time)))
             except CloseProcessPool:
                 logging.warning(f"    KeyboardInterrupt received")
+                return_val = False
             finally:
                 _commit_cached(session=session, models=models, executor=executor, manager=manager)
                 signal.signal(signal.SIGINT, signal.SIG_DFL)
     manager.stop()
-    return True
+    return return_val
