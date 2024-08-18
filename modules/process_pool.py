@@ -1,5 +1,7 @@
 import multiprocessing
 import os, time, logging, json
+import signal
+
 import psutil, gc
 from collections import deque
 
@@ -82,7 +84,7 @@ class WorkerProcess(multiprocessing.Process):
         return cpu, ram
 
     def save_ram_history(self):
-        with open(os.path.join(var.LOGS_DIR, f"ram_{self.name}_{os.getpid()}.json"), 'w') as f:
+        with open(os.path.join(var.LOGS_DIR, f"ram_{self.name}_{self.pid}.json"), 'w') as f:
             json.dump(tuple(self.ram_history), f, indent=var.RUN_INFO_INDENT)
 
 
@@ -134,12 +136,17 @@ class ProcessPool(object):
     def _check_processes(self, manager):
         for i, process in enumerate(self.processes):
             if not process.is_alive():
-                logging.warning(f"Process {process.name} is dead (pid: {process.pid}), restarting in {self.restart_wait}s...")
+                logging.warning(f"Process {process.name} is dead (pid: {process.pid}, exitcode: {process.exitcode}), restarting in {self.restart_wait}s...")
                 unfinished = process.get_current_item()
                 process.save_ram_history()
                 if unfinished is not None:
                     self.input_queue.put(unfinished)
                 process.close()
+                try:
+                    os.kill(process.pid, signal.SIGKILL)
+                    logging.warning(f"Process with pid {process.pid} killed")
+                except ProcessLookupError:
+                    pass
                 del process
                 process = WorkerProcess(number=i,
                                         calculator=self.calculator, graph_kwargs=self.graph_kwargs,
