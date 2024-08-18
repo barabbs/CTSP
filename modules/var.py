@@ -3,7 +3,12 @@ import os, psutil
 BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ERRORS_DIR = os.path.join(DATA_DIR, 'errors')
-LOGS_DIR = os.path.join(DATA_DIR, 'logs')
+BASE_LOGS_DIR = os.path.join(DATA_DIR, 'logs')
+LOGS_DIR = os.path.join(BASE_LOGS_DIR, str(os.getpid()))
+try:
+    os.mkdir(LOGS_DIR)
+except FileExistsError:
+    pass
 MODELS_DIR = os.path.join(DATA_DIR, 'models')
 GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
 DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.cgdb")
