@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, aliased
 
 from modules.models import GRAPH, TIMINGS, GAP_INFO
 from modules import utility as utl
-from modules.process_pool import ProcessPool
+from modules.process_pool import ProcessPool, CloseProcessPool
 from modules.manager import Manager
 
 import logging
@@ -83,8 +83,10 @@ def _get_statement(session, models, where, group_by):
     return tot, statement
 
 
+
+
 def handler(sig, frame):
-    raise StopIteration
+    raise CloseProcessPool
 
 
 def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers, where=None, group_by=None,
@@ -129,7 +131,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
                     if manager.finished():
                         break
                     time.sleep(max(0, 1 - (time.time() - start_time)))
-            except StopIteration:
+            except CloseProcessPool:
                 logging.warning(f"    KeyboardInterrupt received")
             finally:
                 _commit_cached(session=session, models=models, executor=executor, manager=manager)

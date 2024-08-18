@@ -7,6 +7,8 @@ from modules import var
 from modules import utility as utl
 from modules.graph import Graph
 
+class CloseProcessPool(BaseException):
+    pass
 
 class WorkerProcess(multiprocessing.Process):
     def __init__(self, number, calculator, graph_kwargs, input_queue, output_queue, wait_interval=0):
@@ -56,9 +58,15 @@ class WorkerProcess(multiprocessing.Process):
                 self.output_queue.put(results)
 
                 processed_items += len(codings)
+            except CloseProcessPool:
+                logging.warning(f"                [{self.name} {os.getpid():>6}] INTERRUPT")
+                break
             except Exception as err:
                 logging.error(f"Worker encountered an error: {err}")
-                utl.log_error(err, name=self.name, coding=codings)
+                try:  # TODO: Needed???
+                    utl.log_error(err, name=self.name, coding=codings)
+                except UnboundLocalError:
+                    utl.log_error(err, name=self.name)
                 raise
             else:
                 del codings, results
