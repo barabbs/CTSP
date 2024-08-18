@@ -1,6 +1,6 @@
 import multiprocessing
 import os, time, logging, json
-import psutil
+import psutil, gc
 from collections import deque
 
 from modules import var
@@ -132,12 +132,14 @@ class ProcessPool(object):
                 if unfinished is not None:
                     self.input_queue.put(unfinished)
                 process.close()
+                del process
                 process = WorkerProcess(number=i,
                                         calculator=self.calculator, graph_kwargs=self.graph_kwargs,
                                         input_queue=self.input_queue, output_queue=self.output_queue,
                                         wait_interval=self.restart_wait)
                 process.start()
                 self.processes[i] = process
+                gc.collect()
 
     def update(self, manager):
         self._check_processes(manager)
