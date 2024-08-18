@@ -1,5 +1,5 @@
 from modules import var
-import enlighten
+import enlighten, psutil
 import os, math, time
 
 
@@ -32,7 +32,8 @@ class Manager(enlighten.Manager):
                                   self.term.blue('{count_1}') + '+' + self.term.cyan('{count_0}') + \
                                   '/{total:d} ' + u'[{elapsed}<{eta_2}, {interval_2:.2f}s]'
         self.INFOBARS_FORMAT = self.term.black_on_white("{type}") + " {cumulative}|{values}|{post}"
-        self.LOGBAR_FORMAT = self.term.black_on_white("{type:<18}") + "|{value}  {status}"
+        self.LOGBAR_FORMAT = self.term.black_on_white(
+            "{type:<18}") + "|{value:<32}  {status:<4}" + " "*64 + "({children:>2} children)"
 
     def __init__(self, total, **kwargs):
         super().__init__(**kwargs)
@@ -49,8 +50,8 @@ class Manager(enlighten.Manager):
                                                     poisition=i + 1, leave=False)) for i, info in
                              enumerate(self.INFOBARS))
         self.curr_info = 0
-        self.logbar = self.status_bar(status_format=self.LOGBAR_FORMAT, type="", value="", status="", position=4,
-                                      leave=False)
+        self.logbar = self.status_bar(status_format=self.LOGBAR_FORMAT, type="", value="", status="", children=0,
+                                      position=4, leave=False)
 
     def update(self, executor):
         infos, cumul_vals = executor.get_infos()
@@ -70,6 +71,7 @@ class Manager(enlighten.Manager):
         for infobar, cumul, val, post in zip(self.infobars.values(), cumulatives, values, posts):
             infobar.update(cumulative=cumul, values=val, post=post)
         self.curr_info = (self.curr_info + 1) % max_pag
+        self.logbar.update(children=len(psutil.Process().children(recursive=True)))
         self.loaded.refresh()
 
     def add_log(self, type="", value="", status=""):
