@@ -24,10 +24,13 @@ class GAP_Gurobi(Calculation):
         # Sets
         self.nodes = tuple(range(self.n))
         self.edges = tuple((i, j) for i in self.nodes for j in self.nodes if i != j)
+        self._generate_sets()
+        super().__init__(**kwargs)
+
+    def _generate_sets(self):
         self.triplets = tuple((i, j, k) for i, j in self.edges for k in self.nodes if k != i and k != j)
         self.nodes_subs = tuple(filter(lambda S: 2 <= len(S) <= self.n - 2, powerset(self.nodes)))
         self.tours = tuple(permutations(range(1, self.n)))
-        super().__init__(**kwargs)
 
     def _initialize(self):
         self.model
@@ -45,11 +48,10 @@ class GAP_Gurobi(Calculation):
                      self.nodes_subs)  # TODO: replace filter with constructive generation (combinations)
         return self.c[(u, v)] - self.y[(u, 0)] - self.y[(v, 1)] - sum(self.d[S] for S in S_x)
 
-    def _init_model(self):
+    def _generate_model(self):
         # print(f"{os.getpid() - os.getppid():<4} - Initializing gurobi model")
         self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Threads": self.threads,
                                   "Presolve": self.presolve, "Method": self.method, "PreSparsify": self.pre_sparsify})
-        # self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Presolve": self.presolve})
         self.model = gp.Model(env=self.env)
 
         # CREATING VARIABLES AND CONSTRAINTS TAKES UP A LOT OF TIME!
@@ -72,11 +74,30 @@ class GAP_Gurobi(Calculation):
         # self.model.Params.OutputFlag = int(self.verbose)
         return self.model
 
+    def _init_model(self):
+        return self._generate_model()
+
     def __getattr__(self, item):
         # print(f"{os.getpid() - os.getppid():<4} - GETATTR {item}")
         if item == 'model':
             return self._init_model()
         raise AttributeError
+
+    def __str__(self):
+        return f"model_n{self.n}"
+
+    def save(self):
+        self.model.write(os.path.join(var.MODELS_DIR, f"{self}.mps"))
+
+    def load(self):
+        self.env = gp.Env(params={"OutputFlag": int(self.verbose), "Threads": self.threads,
+                                  "Presolve": self.presolve, "Method": self.method, "PreSparsify": self.pre_sparsify})
+        self.model = gp.read(os.path.join(var.MODELS_DIR, f"{self}.mps"), env=self.env)
+        self._load_vars_constr()
+
+    def _load_vars_constr(self):
+        self.c = gp.tupledict(((u, v), self.model.getVarByName(f"c[{u},{v}]")) for u, v in self.edges)
+        self.dual_constr = gp.tupledict(((u, v), self.model.getConstrByName(f"dual[{u},{v}]")) for u, v in self.edges)
 
     def _update_obj_constr(self, graph):
         for u, v, value in graph.edge_count_generator(weight=True):
@@ -102,8 +123,8 @@ class GAP_Gurobi(Calculation):
 BOUND_THRESHOLD = 1e-15
 
 
-class GAP_Gurobi_Bound_Base(GAP_Gurobi):
-    CALC_TYPE = var.CALC_GAP
+class GAP_Gurobi_Bound(GAP_Gurobi):
+    CALC_NAME = "Gurobi w/ Bound"
 
     def __init__(self, n, obj_bound=None, bound_strict=False, **kwargs):
         self.obj_bound = obj_bound or utl.get_best_gap(n - 1)
@@ -114,35 +135,6 @@ class GAP_Gurobi_Bound_Base(GAP_Gurobi):
                 self.obj_bound = (1 / self.obj_bound) + BOUND_THRESHOLD
         self.obj_bound_constr = None
         super().__init__(n=n, **kwargs)
-
-
-class GAP_Gurobi_Bound_Constr(GAP_Gurobi_Bound_Base):
-    CALC_NAME = "Gurobi w/ Bound (constraint)"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.obj_bound_constr = None
-
-    def _update_obj_constr(self, graph):
-        super()._update_obj_constr(graph)
-        if self.obj_bound_constr is not None:
-            self.model.remove(self.obj_bound_constr)
-        if self.obj_bound is not None:
-            self.obj_bound_constr = self.model.addConstr(
-                gp.LinExpr(tuple((value, self.c[(u, v)]) for u, v, value in
-                                 graph.edge_count_generator(weight=True))) <= self.obj_bound,
-                name="obj_bound")
-            # self.obj_bound_constr = self.model.addConstr(
-            #     gp.quicksum((value * self.c[(u, v)] for u, v, value in
-            #                  graph.edge_count_generator(weight=True))) < self.obj_bound,
-            #     name="obj_bound")
-
-
-class GAP_Gurobi_Bound_Callback(GAP_Gurobi_Bound_Base):
-    CALC_NAME = "Gurobi w/ Bound (callback)"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
         self.callback = self._get_callback()
 
     def _get_callback(self):
@@ -172,10 +164,78 @@ class GAP_Gurobi_Bound_Callback(GAP_Gurobi_Bound_Base):
         return None
 
 
+# class GAP_Gurobi_Bound_Constr(GAP_Gurobi_Bound_Base):
+#     CALC_NAME = "Gurobi w/ Bound (constraint)"
+#
+#     def __init__(self, n, obj_bound=None, bound_strict=False, **kwargs):
+#         raise NotImplemented
+#         self.obj_bound = obj_bound or utl.get_best_gap(n - 1)
+#         if self.obj_bound is not None:
+#             if bound_strict:
+#                 self.obj_bound = (1 / self.obj_bound) - BOUND_THRESHOLD
+#             else:
+#                 self.obj_bound = (1 / self.obj_bound) + BOUND_THRESHOLD
+#         self.obj_bound_constr = None
+#         super().__init__(n=n, **kwargs)
+#
+#     def _update_obj_constr(self, graph):
+#         super()._update_obj_constr(graph)
+#         if self.obj_bound_constr is not None:
+#             self.model.remove(self.obj_bound_constr)
+#         if self.obj_bound is not None:
+#             self.obj_bound_constr = self.model.addConstr(
+#                 gp.LinExpr(tuple((value, self.c[(u, v)]) for u, v, value in
+#                                  graph.edge_count_generator(weight=True))) <= self.obj_bound,
+#                 name="obj_bound")
+#             # self.obj_bound_constr = self.model.addConstr(
+#             #     gp.quicksum((value * self.c[(u, v)] for u, v, value in
+#             #                  graph.edge_count_generator(weight=True))) < self.obj_bound,
+#             #     name="obj_bound")
+
+
+class GAP_Gurobi_Lazy(GAP_Gurobi):
+    CALC_NAME = "Gurobi Lazy"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not os.path.exists(os.path.join(var.MODELS_DIR, f"{self}.mps")):
+            logging.warning(f"File for {self} not found, generating....")
+            super()._generate_sets()
+            self._generate_model()
+            self.save()
+
+    def _generate_sets(self):
+        pass
+
+    def _init_model(self):
+        self.load()
+        return self.model
+
+class GAP_Gurobi_Lazy_Bound(GAP_Gurobi_Lazy, GAP_Gurobi_Bound):
+    CALC_NAME = "Gurobi Lazy w/ Bound"
+
+class GAP_Gurobi_Laziest(GAP_Gurobi_Lazy):
+    CALC_NAME = "Gurobi Laziest"
+
+    def _load_vars_constr(self):
+        pass
+
+    def _update_obj_constr(self, graph):
+        for u, v, value in graph.edge_count_generator(weight=True):
+            self.model.getVarByName(f"c[{u},{v}]").Obj = value
+            self.model.getConstrByName(f"dual[{u},{v}]").Sense = '=' if value > 0 else '>'
+
+class GAP_Gurobi_Laziest_Bound(GAP_Gurobi_Laziest, GAP_Gurobi_Bound):
+    CALC_NAME = "Gurobi Laziest w/ Bound"
+
 CALCULATIONS_LIST = (
-    GAP_Gurobi_Bound_Callback,
+    GAP_Gurobi_Lazy_Bound,
+    GAP_Gurobi_Lazy,
+    GAP_Gurobi_Laziest_Bound,
+    GAP_Gurobi_Laziest,
+    GAP_Gurobi_Bound,
     GAP_Gurobi,
-    GAP_Gurobi_Bound_Constr,
+    # GAP_Gurobi_Bound_Constr,
 )
 
 """
