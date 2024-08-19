@@ -103,15 +103,24 @@ class Manager(enlighten.Manager):
         return self.progbar.update(num)
 
     def update_cached(self, num=1):
-        if self.committed.count == 0:
+        if self.get_committed() == 0:
             self.progbar.start = time.time()
         return self.cached.update_from(self.progbar, num)
 
     def update_committed(self, num=1):
         return self.committed.update_from(self.cached, num)
 
+    def get_committed(self):
+        return self.committed.count
+
+    def get_remaining(self):
+        return self.total - self.committed.count
+
     def get_loaded_count(self):
         return self.progbar.count - self.progbar.subcount
+
+    def get_start_time(self):
+        return self.progbar.start
 
     def print_status(self):
         for infobar in self.infobars.values():

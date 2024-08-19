@@ -6,6 +6,7 @@ from modules import utility as utl
 from modules.process_pool import ProcessPool, CloseProcessPool
 from modules.manager import Manager
 
+from enlighten._util import format_time
 import logging
 import signal
 import time
@@ -21,18 +22,18 @@ COMMIT_TYPES = {GRAPH: COMMIT_UPDATE,
 
 def _commit_cached(session, models, executor, manager):
     cache = executor.get_cache()
-    total = len(cache)
-    if total == 0:
+    committed = len(cache)
+    if committed == 0:
         manager.add_log(type="COMMIT", value="Nothing to commit")
         return
     manager.add_log(type="COMMIT",
-                    value=f"Committing {total} results ({manager.total - manager.committed.count - total} remaining)")
+                    value=f"Committing {committed} results ({manager.get_remaining() - committed} remaining)")
     for mod in cache[0][1].keys():
         session.execute(COMMIT_TYPES[mod](models[mod]),
                         tuple(dict(id=coding, **result[mod]) for coding, result in cache))
     session.commit()
     del cache
-    manager.update_committed(total)
+    manager.update_committed(committed)
     manager.change_log_status(status="DONE")
 
 
@@ -65,7 +66,7 @@ def _get_statement(session, models, where, group_by):
 
     tot = count_stmnt.count()
     if tot == 0:
-        return tot, None
+        return tot, None, None
 
     if group_by is None:
         statement = select(models[GRAPH].coding).where(
@@ -79,7 +80,15 @@ def _get_statement(session, models, where, group_by):
             isouter=True
         ).where(graph_alias.coding.is_(None), *where_smnt)
 
-    return tot, statement
+    cmpl_stmnt = session.query(models[GRAPH])
+    cmpl_where = dict(filter(lambda i: i[1] is not None, where.items()))
+    if len(cmpl_where) > 0:
+        cmpl_stmnt = cmpl_stmnt.where(*tuple(getattr(models[GRAPH], attr).is_(val) for attr, val in cmpl_where.items()))
+    if group_by is not None:
+        cmpl_stmnt = cmpl_stmnt.group_by(getattr(models[GRAPH], group_by))
+    complete = cmpl_stmnt.count()
+
+    return tot, complete, statement
 
 
 def handler(sig, frame):
@@ -89,7 +98,7 @@ def handler(sig, frame):
 def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers, where=None, group_by=None,
                  **options):  # TODO: Sistemare questo schifo immondo.
     with Session(engine) as session:
-        tot, statement = _get_statement(session, models, where, group_by)
+        tot, complete, statement = _get_statement(session, models, where, group_by)
         if tot == 0:
             logging.trace(f"    Nothing to do :)")
             return True
@@ -100,7 +109,8 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
         batch_size = chunksize * options["batch_chunks"] * workers
         batches = int(np.ceil(tot / batch_size))
 
-        logging.trace(f"    Total {tot:>8}    (chunksize {chunksize} / {batches} batches of {batch_size})")
+        logging.trace(
+            f"    To run {tot} out of {complete}    (chunksize {chunksize}, {batches} batches of {batch_size})")
 
         codings_gen = session.scalars(statement).partitions(size=batch_size)
         calculator = calculators.get_calculation(calc_type, n=n, k=k, weights=weights, **options)
@@ -108,7 +118,6 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
         batch_n = 0
         next_commit = time.time() + options["commit_interval"]
         return_val = True
-
         with ProcessPool(
                 calculator=calculator, graph_kwargs=dict(n=n, k=k, weights=weights),
                 max_workers=workers, chunksize=chunksize, **options
@@ -118,7 +127,7 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
                 for pre_batch in range(options["preloaded_batches"]):
                     batch_n = _launch_batch(codings_gen, executor, manager, batch_n, batches)
                 while True:
-                    start_time = time.time()
+                    cycle_time = time.time()
                     manager.update(executor)
                     if manager.get_loaded_count() <= options["preloaded_batches"] * batch_size:
                         batch_n = _launch_batch(codings_gen, executor, manager, batch_n, batches)
@@ -128,12 +137,20 @@ def parallel_run(engine, models, n, k, weights, calc_type, calculators, workers,
                         next_commit = time.time() + options["commit_interval"]
                     if manager.finished():
                         break
-                    time.sleep(max(0, 1 - (time.time() - start_time)))
+                    time.sleep(max(0, 1 - (time.time() - cycle_time)))
             except CloseProcessPool:
                 logging.warning(f"    KeyboardInterrupt received")
                 return_val = False
             finally:
                 _commit_cached(session=session, models=models, executor=executor, manager=manager)
                 signal.signal(signal.SIGINT, signal.SIG_DFL)
+                run_time = time.time() - manager.get_start_time()
+    logging.trace(f"    Completed {manager.get_committed()} in {format_time(run_time)}")
+    if manager.get_committed() > 0:
+        avg_time = run_time / manager.get_committed()
+        logging.trace(
+            f"    Remaining {manager.get_remaining():>8}  ({format_time(manager.get_remaining() * avg_time)})")
+        logging.trace(
+            f"    Total     {complete:>8}  ({format_time(complete * avg_time)})")
     manager.stop()
     return return_val

@@ -115,10 +115,10 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
                                         strategy=strategy, generator=generator, calculators=calculators)
     if delete and os.path.exists(path):
         os.remove(path)
-        logging.info(f"Deleted database {os.path.basename(path)}")
+        logging.trace(f"    Deleted database {os.path.basename(path)}")
     engine = create_engine(f"sqlite:///{path}", echo=sql_verbose)
     if not os.path.exists(path):
-        logging.info(f"Generating database {os.path.basename(path)}")
+        logging.trace(f"    Generating database {os.path.basename(path)}")
         try:
             metadata.create_all(engine)
             generator_func = CODINGS_GENERATORS[generator]['func']
@@ -131,7 +131,7 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
             logging.warning(f"Interupted - Deleting database {os.path.basename(path)}")
             os.remove(path)
             raise
-    logging.info(f"Loaded database {os.path.basename(path)}")
+    logging.trace(f"    Loaded database {os.path.basename(path)}")
     return engine
 
 
@@ -165,6 +165,7 @@ OPTIONS
 """)
     start_time = time.time()
     metadata, models = get_models(n, k, weights)
+    logging.info("DATABASE")
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights,
                                  strategy=strategy, generator=generator, calculators=calculators,
@@ -172,7 +173,7 @@ OPTIONS
     utl.save_run_info_file(infos, start_time=start_time, time_name="database", delete=options['delete'])
     for calc_type, statements in STRATEGIES[strategy]['sequence']:
         logging.info(
-            f"Begin {calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
+            f"{calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
         start_time = time.time()
         result = parallel_run(engine=engine, models=models,
                               n=n, k=k, weights=weights,
