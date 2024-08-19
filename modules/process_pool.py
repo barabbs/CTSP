@@ -41,7 +41,7 @@ class WorkerProcess(multiprocessing.Process):
     def run(self):
         time.sleep(self.wait_interval)
         os.nice(var.PROCESSES_NICENESS)
-        logging.process(f"                [{self.name} {os.getpid():>6}] START")
+        logging.debug(f"                [{self.name} {os.getpid():>6}] START")
         self.calculator.initialize()
 
         processed_items = 0
@@ -77,7 +77,7 @@ class WorkerProcess(multiprocessing.Process):
                 if self.debug_memory:
                     utl.save_memory_summary(f"summary_{self.name}_{os.getpid()}.txt", processed_items)
         self.calculator.close()
-        logging.process(f"                [{self.name} {os.getpid():>6}] END  ({processed_items} processed)")
+        logging.debug(f"                [{self.name} {os.getpid():>6}] END  ({processed_items} processed)")
         del self.calculator
 
     def get_infos(self):
@@ -142,8 +142,9 @@ class ProcessPool(object):
         for i, process in enumerate(self.processes):
             if not process.is_alive():
                 unfinished = process.get_current_item()
-                logging.warning(
-                    f"{process.name} dead (pid: {process.pid}, exitcode: {process.exitcode}, unfinished: {unfinished}), restart in {self.restart_wait}s...")
+                manager.add_log(type="PROCESS",
+                                value=f"{process.name} dead [pid: {process.pid}, exitcode: {process.exitcode}" + (
+                                    f", unfinished: {' - '.join(utl.seqence_to_str(c) for c in unfinished[0])}" if unfinished is not None else "") + "]")
                 process.save_ram_history()
                 if unfinished is not None:
                     self.input_queue.put(unfinished)

@@ -24,10 +24,9 @@ def _commit_cached(session, models, executor, manager):
     total = len(cache)
     if total == 0:
         manager.add_log(type="COMMIT", value="Nothing to commit")
-        logging.stage(f"    Nothing to commit")
         return
-    manager.add_log(type="COMMIT", value=f"Committing {total} results...")
-    logging.stage(f"            Committing {total} results")
+    manager.add_log(type="COMMIT",
+                    value=f"Committing {total} results ({manager.total - manager.committed.count - total} remaining)")
     for mod in cache[0][1].keys():
         session.execute(COMMIT_TYPES[mod](models[mod]),
                         tuple(dict(id=coding, **result[mod]) for coding, result in cache))
@@ -39,7 +38,7 @@ def _commit_cached(session, models, executor, manager):
 
 def _launch_batch(codings_gen, executor, manager, batch_n, batches):
     if batch_n < batches:
-        manager.add_log(type="LOADING", value=f"Loading batch {batch_n + 1:3}/{batches:3}...")
+        manager.add_log(type="LOADING", value=f"Loading batch {batch_n + 1:3}/{batches:3}")
     try:
         codings_batch = next(codings_gen)
     except StopIteration:
@@ -81,8 +80,6 @@ def _get_statement(session, models, where, group_by):
         ).where(graph_alias.coding.is_(None), *where_smnt)
 
     return tot, statement
-
-
 
 
 def handler(sig, frame):

@@ -3,8 +3,9 @@ from modules import var
 from modules.combinatorics import CODINGS_GENERATORS
 from modules.calculations import CANON, CERTIFICATE, SUBT_EXTR, GAP, CALCULATIONS
 import argparse
+from datetime import datetime
 
-import sys
+import sys, os
 import logging
 from functools import partial, partialmethod
 
@@ -18,19 +19,39 @@ logging.addLevelName(logging.PROCESS, 'PRCSS')
 logging.Logger.process = partialmethod(logging.Logger.log, logging.PROCESS)
 logging.process = partial(logging.log, logging.PROCESS)
 
-logging.STAGE = 12
-logging.addLevelName(logging.STAGE, 'STAGE')
-logging.Logger.stage = partialmethod(logging.Logger.log, logging.STAGE)
-logging.stage = partial(logging.log, logging.STAGE)
+logging.RLOG = 12
+logging.addLevelName(logging.RLOG, 'LOG  ')
+logging.Logger.rlog = partialmethod(logging.Logger.log, logging.RLOG)
+logging.rlog = partial(logging.log, logging.RLOG)
+
+LOG_FORMAT = "[%(asctime)s] %(levelname)s\t%(message)s"
 
 
 def init_logging(level):
-    logging.basicConfig(
-        level=level,
-        # format="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
-        format="[%(asctime)s] %(levelname)s     %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stdout)
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Capture all messages
+    # Create file handler
+    file_handler = logging.FileHandler(os.path.join(var.LOGS_DIR, f"{datetime.now().strftime(var.DATETIME_FORMAT)}.log"))
+    file_handler.setLevel(logging.RLOG)  # Log everything to file
+    file_formatter = logging.Formatter(LOG_FORMAT)
+    file_handler.setFormatter(file_formatter)
+
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)  # Log info and above to console
+    console_formatter = logging.Formatter(LOG_FORMAT)
+    console_handler.setFormatter(console_formatter)
+
+    # Add handlers to logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    # logging.basicConfig(
+    #     level=level,
+    #     # format="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
+    #     format="[%(asctime)s] %(levelname)s     %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S",
+    #     stream=sys.stdout)
 
 
 # Initialize parser
@@ -128,7 +149,7 @@ if __name__ == '__main__':
     elif verbosity == 2:
         init_logging(level=logging.PROCESS)
     elif verbosity == 3:
-        init_logging(level=logging.STAGE)
+        init_logging(level=logging.RLOG)
     elif verbosity >= 4:
         init_logging(level=logging.DEBUG)
     elif verbosity <= -1:

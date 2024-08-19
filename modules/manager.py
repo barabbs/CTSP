@@ -1,6 +1,7 @@
 from modules import var
 import enlighten, psutil
 import os, math, time
+import logging
 
 
 def _colorize(val, term, type, proc_num=None, avg=False):
@@ -82,6 +83,7 @@ class Manager(enlighten.Manager):
 
     def add_log(self, type="", value="", status=""):
         self.logbar.update(type=type, value=value, status=status)
+        logging.rlog(f"{type:<10}  {value}")
 
     def change_log_status(self, status):
         self.logbar.update(status=status)
