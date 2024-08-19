@@ -145,6 +145,7 @@ class ProcessPool(object):
                 manager.add_log(type="PROCESS",
                                 value=f"{process.name} dead [pid: {process.pid}, exitcode: {process.exitcode}" + (
                                     f", unfinished: {' - '.join(utl.seqence_to_str(c) for c in unfinished[0])}" if unfinished is not None else "") + "]")
+                manager.deaths += 1
                 process.save_ram_history()
                 if unfinished is not None:
                     self.input_queue.put(unfinished)

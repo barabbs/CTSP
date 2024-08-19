@@ -33,8 +33,10 @@ class Manager(enlighten.Manager):
                                   self.term.blue('{count_1}') + '+' + self.term.cyan('{count_0}') + \
                                   '/{total:d} ' + u'[{elapsed}<{eta_2}, {interval_2:.2f}s]'
         self.INFOBARS_FORMAT = self.term.black_on_white("{type}") + " {cumulative}|{values}|{post}"
-        self.LOGBAR_FORMAT = self.term.black_on_white(
-            "{type:<18}") + "|{value:<32}  {status:<4}" + "{filler}" + "({children:>3} children)"
+        self.LOGBAR_FORMAT = (self.term.black_on_white("{type:<18}") + "|{value}{status:^6}|{children:>3} prcs{deaths}",
+                              self.term.black_on_white("{type:<18}") + "|{value}" + self.term.black_on_white(
+                                  "{status:^6}") + "|{children:>3} prcs{deaths}"
+                              )
 
     def __init__(self, total, **kwargs):
         super().__init__(**kwargs)
@@ -50,9 +52,9 @@ class Manager(enlighten.Manager):
                                                     type=info, cumulative=0, values="", post="",
                                                     poisition=i + 1, leave=False)) for i, info in
                              enumerate(self.INFOBARS))
-        self.curr_info = 0
-        self.logbar = self.status_bar(status_format=self.LOGBAR_FORMAT, type="", value="", status="", children=0,
-                                      filler="",
+        self.curr_info, self.deaths = 0, 0
+        self.logbar = self.status_bar(status_format=self.LOGBAR_FORMAT[0],
+                                      type="", value="", status="", children=0, deaths="",
                                       position=4, leave=False)
         self._update_logbar_filler()
 
@@ -77,15 +79,24 @@ class Manager(enlighten.Manager):
         for infobar, cumul, val, post in zip(self.infobars.values(), cumulatives, values, posts):
             infobar.update(cumulative=cumul, values=val, post=post)
         self.curr_info = (self.curr_info + 1) % max_pag
-        self.logbar.update(children=len(psutil.Process().children(recursive=True)))
+        if self.deaths > 0:
+            death_time = (time.time() - self.progbar.start) // self.deaths
+            deaths = f", {death_time:.1e}s" if death_time >= 10 ** 7 else f", {death_time:>7}s"
+        else:
+            deaths = ""
+        self.logbar.update(children=len(psutil.Process().children(recursive=True)), deaths=deaths)
         self._update_logbar_filler()
         self.progbar.refresh()
 
-    def add_log(self, type="", value="", status=""):
-        self.logbar.update(type=type, value=value, status=status)
+    def add_log(self, type="", value=""):
+        self.logbar.status_format = self.LOGBAR_FORMAT[0]
+        self.logbar.update(type=type,
+                           value=value.ljust(os.get_terminal_size().columns - 44),
+                           status="")
         logging.rlog(f"{type:<10}  {value}")
 
     def change_log_status(self, status):
+        self.logbar.status_format = self.LOGBAR_FORMAT[1]
         self.logbar.update(status=status)
 
     def update_loaded(self, num=1):
