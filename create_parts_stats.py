@@ -42,11 +42,12 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var.DEFAU
                                  strategy=strategy, generator=generator, calculators=calculators)
     with open(os.path.join(var.DATA_DIR, f"k{k}_n{n}.csv"), "w") as f:
         with (Session(engine) as session):
+            print(f"\nn={n}    total {session.query(g_class.coding).where().count()}\n" + "-"*128)
             gaps = sorted(set(round(x, ROUNDING) for x in session.scalars(select(g_class.gap).distinct()).all() if x is not None),
                           reverse=True)
             threshold = 10**-ROUNDING
-            print(" "*16 + "   ".join(f"{gap:#5.4}" for gap in gaps))
-            f.write(",," + ",".join(f"{gap:7.6}" for gap in gaps) + "\n")
+            print(" "*16 + "   ".join(f"{gap:#5.4}" for gap in gaps) + "    GAPS      TOTAL\n")
+            f.write(",," + ",".join(f"{gap:7.6}" for gap in gaps) + ",GAPS,TOTAL\n")
 
             partitions = tuple(partition(n, maximum=n - 2, minimum=2))
             for i_p, p_1 in enumerate(partitions):
@@ -62,8 +63,13 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var.DEFAU
                             )).count()
                         print(f"{val:>5}", end="   ")
                         f.write(f",{val}")
-                    print()
-                    f.write("\n")
+                    no_gap = session.query(g_class.coding).where(and_(
+                        g_class.parts == parts,
+                        g_class.gap.is_(None)
+                    )).count()
+                    total = session.query(g_class.coding).where(g_class.parts == parts).count()
+                    print(f"{total-no_gap:>5}{total:>11}")
+                    f.write(f",{total-no_gap},{total}\n")
 
 
 
