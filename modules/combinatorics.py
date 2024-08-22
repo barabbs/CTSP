@@ -1,6 +1,8 @@
 from itertools import permutations, combinations
 from functools import cache
+from modules import var
 
+import json
 import logging
 
 
@@ -94,6 +96,24 @@ def half_codings_generator(n, k=2):
     get_non_integer.cache_clear()
 
 
+def manual_codings_generator(n, k=2):
+    if not k == 2:
+        raise NotImplemented
+    nodes = tuple(range(n))
+    with open(var.GENERATOR_SETTINGS_FILEPATH.format(n=n, k=k), 'r') as f:
+        data = json.load(f)
+    parts = data['parts']
+    for p_1, p_2 in parts:
+        p_1, p_2 = tuple(p_1), tuple(p_2)
+        c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
+        succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
+        print("######")
+        for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
+            yield (c_1, c_2), (p_1, p_2)
+    cycles_no_integer.cache_clear()
+    get_non_integer.cache_clear()
+
+
 CODINGS_GENERATORS = {
     'f': {
         'name': "full",
@@ -104,6 +124,11 @@ CODINGS_GENERATORS = {
         'name': "half",
         'descr': "generates all graph codings with non-integer edges ",
         'func': half_codings_generator
+    },
+    'm': {
+        'name': "manual",
+        'descr': "generates graph codings as described in the relative generator settings",
+        'func': manual_codings_generator
     },
 }
 

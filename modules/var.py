@@ -4,6 +4,7 @@ BASE_DIR = os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ERRORS_DIR = os.path.join(DATA_DIR, 'errors')
 BASE_LOGS_DIR = os.path.join(DATA_DIR, 'logs')
+GENERATOR_SETTINGS_DIR = os.path.join(DATA_DIR, 'gen_settings')
 LOGS_DIR = os.path.join(BASE_LOGS_DIR, str(os.getpid()))
 try:
     os.mkdir(LOGS_DIR)
@@ -13,6 +14,7 @@ MODELS_DIR = os.path.join(DATA_DIR, 'models')
 GRAPH_DRAW_DIR = os.path.join(DATA_DIR, "k{k}_n{n}")
 DATABASE_FILEPATH = os.path.join(DATA_DIR, "graphs_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.cgdb")
 RUN_INFO_FILEPATH = os.path.join(DATA_DIR, "run_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.json")
+GENERATOR_SETTINGS_FILEPATH = os.path.join(GENERATOR_SETTINGS_DIR, "generator_settings_k{k}_n{n}.json")
 BEST_GAPS_FILEPATH = os.path.join(DATA_DIR, "best_gaps.json")
 RUN_INFO_INDENT = 4
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
