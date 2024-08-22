@@ -107,7 +107,6 @@ def manual_codings_generator(n, k=2):
         p_1, p_2 = tuple(p_1), tuple(p_2)
         c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
         succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
-        print("######")
         for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
             yield (c_1, c_2), (p_1, p_2)
     cycles_no_integer.cache_clear()
