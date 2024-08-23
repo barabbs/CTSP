@@ -39,43 +39,37 @@ class WorkerProcess(multiprocessing.Process):
         self.psutil_proc = psutil.Process(self.pid)
 
     def run(self):
-        time.sleep(self.wait_interval)
-        os.nice(var.PROCESSES_NICENESS)
-        logging.debug(f"                [{self.name} {os.getpid():>6}] START")
-        self.calculator.initialize()
+        try:
+            time.sleep(self.wait_interval)
+            os.nice(var.PROCESSES_NICENESS)
+            logging.debug(f"                [{self.name} {os.getpid():>6}] START")
+            self.calculator.initialize()
 
-        processed_items = 0
-        while True:
-            try:
+            processed_items = 0
+            while True:
                 codings = self.input_queue.get(block=True)
                 if codings is None:
                     break
                 self.set_current_item(codings)
-                # if self.name == "worker_000":
-                #     print(os.getpid())
-                #     time.sleep(5)
-                #     return
                 results = list((
                                    coding,
                                    self.calculator.calc(Graph(**self.graph_kwargs, coding=coding))
                                ) for coding in codings)
                 self.output_queue.put(results)
                 processed_items += len(codings)
-            except CloseProcessPool:
-                logging.warning(f"                [{self.name} {os.getpid():>6}] INTERRUPT")
-                break
-            except Exception as err:
-                logging.error(f"Worker encountered an error: {err}")
-                try:  # TODO: Needed???
-                    utl.log_error(err, name=self.name, coding=codings)
-                except UnboundLocalError:
-                    utl.log_error(err, name=self.name)
-                raise
-            else:
                 del codings, results
                 self.set_current_item()
                 if self.debug_memory:
                     utl.save_memory_summary(f"summary_{self.name}_{os.getpid()}.txt", processed_items)
+        except CloseProcessPool:
+            logging.warning(f"                [{self.name} {os.getpid():>6}] INTERRUPT")
+        except Exception as err:
+            logging.error(f"Worker encountered an error: {err}")
+            try:  # TODO: Needed???
+                utl.log_error(err, name=self.name, coding=codings)
+            except UnboundLocalError:
+                utl.log_error(err, name=self.name)
+            raise
         self.calculator.close()
         logging.debug(f"                [{self.name} {os.getpid():>6}] END  ({processed_items} processed)")
         del self.calculator
