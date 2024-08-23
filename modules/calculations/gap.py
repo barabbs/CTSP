@@ -114,7 +114,9 @@ class GAP_Gurobi(Calculation):
         #     self.presolve_queue.put(time.process_time_ns())
         self.model.optimize(callback=self.callback)
         if self.model.Status == GRB.OPTIMAL:  # Optimal solution found
-            return {var.GRAPH_TABLE: {'gap': 1 / self.model.objVal}}
+            gap = 1 / self.model.objVal
+            logging.result(f"        {graph} has gap {gap:5.4f}")
+            return {var.GRAPH_TABLE: {'gap': gap}}
         elif self.model.Status == GRB.INFEASIBLE or self.model.Status == GRB.INTERRUPTED:
             return {var.GRAPH_TABLE: {'gap': 0}}
         logging.warning(f"Status {self.model.Status} of optimization for graph {graph} not recognized!")

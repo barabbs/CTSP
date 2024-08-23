@@ -14,6 +14,11 @@ logging.addLevelName(logging.TRACE, 'TRACE')
 logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
 logging.trace = partial(logging.log, logging.TRACE)
 
+logging.RESULT = 16
+logging.addLevelName(logging.RESULT, 'RESLT')
+logging.Logger.result = partialmethod(logging.Logger.log, logging.RESULT)
+logging.result = partial(logging.log, logging.RESULT)
+
 logging.PROCESS = 15
 logging.addLevelName(logging.PROCESS, 'PRCSS')
 logging.Logger.process = partialmethod(logging.Logger.log, logging.PROCESS)
@@ -147,10 +152,12 @@ if __name__ == '__main__':
     elif verbosity == 1:
         init_logging(level=logging.TRACE)
     elif verbosity == 2:
-        init_logging(level=logging.PROCESS)
+        init_logging(level=logging.RESULT)
     elif verbosity == 3:
+        init_logging(level=logging.PROCESS)
+    elif verbosity == 4:
         init_logging(level=logging.RLOG)
-    elif verbosity >= 4:
+    elif verbosity >= 5:
         init_logging(level=logging.DEBUG)
     elif verbosity <= -1:
         init_logging(level=logging.WARNING)
