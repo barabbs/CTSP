@@ -8,7 +8,7 @@ def _colorize(val, term, type, proc_num=None, avg=False):
     if avg:
         val = val / proc_num if proc_num else 0.0
     if type == "CPU":
-        s = f"{val:3.0f}" if avg else f"{val:4.0f}"
+        s = f"{val:3.0f}%" if avg else f"{val:4.0f}"
         if val <= 5:
             return term.red(s)
         elif val >= 90:
@@ -16,7 +16,7 @@ def _colorize(val, term, type, proc_num=None, avg=False):
         return term.yellow(s)
     elif type == "RAM":
         thresh = var.TOTAL_RAM / proc_num
-        s = f"{val:3.1f}" if avg else f"{val:4.1f}"
+        s = f"{val:4.1f}" if avg else f"{val:4.1f}"
         if val <= 0.9 * thresh:
             return term.green(s)
         elif 0.9 * thresh <= val <= thresh:
