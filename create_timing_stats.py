@@ -6,9 +6,10 @@ from modules.models import get_models, GRAPH, TIMINGS
 from sqlalchemy.orm import Session
 import numpy as np
 import json
+import logging
 import argparse
 from sqlalchemy import func
-from main import parser
+from main import parser, init_logging
 
 PROPS = ('subt_extr', 'canon', 'cert')
 
@@ -81,10 +82,12 @@ def run(n_range, k=2, weights=None, strategy="P", generator="h", calcs_indices=N
 
 
 if __name__ == '__main__':
+    init_logging(level=logging.TRACE)
     args = parser.parse_args()
     calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
 
     args = parser.parse_args()
     run(n_range=args.n, k=args.k[0], weights=args.weights,
-        strategy=args.strategy.upper(), generator=args.generator.lower(), calcs_indices=calcs_indices,
+        strategy=args.strategy.upper(), generator=args.generator.lower(),
+        calcs_indices=calcs_indices,
         )
