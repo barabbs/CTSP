@@ -41,11 +41,11 @@ def _get_avg(checks, classes, engines, properties):
         engine = engines[n]
         with (Session(engine) as session):
             query = session.query(*tuple(getattr(g_timings, p) for p in properties)).join(g_timings.graph)
-            if checks["subt_extr"]:
+            if checks.get("subt_extr", False):
                 query = query.where(g_class.prop_subt.is_(True), g_class.prop_extr.is_(True))
-            if checks["canon"]:
+            if checks.get("canon", False):
                 query = query.where(g_class.prop_canon.is_(True))
-            if checks["cert"]:
+            if checks.get("cert", False):
                 query = query.group_by(g_class.certificate)
             data = np.array(query.all()).transpose()
             # print(data[0], data[1], data[2])
