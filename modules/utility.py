@@ -76,7 +76,7 @@ def prettyprint_graph_adj(n, adj, labels=None, line_start="\t"):
                 val = adj.get((labels[0][i], labels[1][j]), None)
                 # if val == 1:
                 #     remove = True
-                print(CHARACTERS[val], end=SEPARATOR)
+                print(CHARACTERS.get(val, val), end=SEPARATOR)
         print()
     # if remove:
     #     transl = dict()

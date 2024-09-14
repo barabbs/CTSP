@@ -63,7 +63,7 @@ def plot_graph(graph, coding, properties=None, gap=None):
 
 
 def save_graph_drawing(n, k, coding):
-    path = os.path.join(var.GRAPH_DRAW_DIR.format(k=k, n=n), var.DRAWINGS_FILENAME.format(coding=coding))
+    path = os.path.join(var.DRAWINGS_DIR.format(k=k, n=n), var.DRAWINGS_FILENAME.format(coding=coding))
     try:
         plt.savefig(fname=path, dpi=var.DRAWINGS_DPI)
     except FileNotFoundError:
@@ -75,3 +75,67 @@ def save_graph_drawing(n, k, coding):
 
 def show_graph_drawing():
     plt.show()
+
+
+####    LATEX    ####
+
+DEFAULT_LATEX_OPTIONS = {"default_edge_options": "baseedgestyle",
+                         # "default_node_options": "nodestyle",
+                         "tikz_options": "graphstyle",
+                         }
+LATEX_EDGE_STYLES = ["edgestyle0", "edgestyle1"]
+LATEX_DOUBLEEDGE_STYLE = "doubleedge"
+LATEX_DIGON_STYLE = "digonstyle"
+LATEX_NODES_STYLE = "nodestyle"
+LATEX_CODING_STYLE = "codingstyle"
+
+
+def _get_latex_edges_styles(graph, colors=None):
+    styles = dict()
+    colors = colors or tuple(range(graph.k))
+    for u, v in set(graph.graph.edges()):
+        ks = tuple(graph.graph[u][v].keys())
+        if len(ks) == 2:
+            styles[(u, v)] = f"{LATEX_DOUBLEEDGE_STYLE}=" + ":".join(LATEX_EDGE_STYLES[colors[ks[k]]] for k in ks)
+        else:
+            styles[(u, v)] = LATEX_EDGE_STYLES[colors[ks[0]]]
+        if (v, u) in graph.graph.edges():
+            styles[(u, v)] += f", {LATEX_DIGON_STYLE}"
+    return styles
+
+
+def _get_coding_text(coding):
+    return "{" + "\\\\".join("$\\big[\\," +
+                             "\\,\\big|\\,".join("\\,".join(str(p) for p in cycle) for cycle in cover.cycles) +
+                             "\\,\\big]$" for cover in coding.covers) + "}"
+
+
+def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', colors=None, begin=None, end=None, insertfile=None, **new_options):
+    coding = coding or graph.coding
+    nx_graph = graph.weighted_digraph
+    options = DEFAULT_LATEX_OPTIONS.copy()
+    options["edge_options"] = _get_latex_edges_styles(graph, colors)
+    for edge, opt in new_options.pop("edge_options", dict()).items():
+        options["edge_options"][edge] += f", {opt}"
+    options.update(new_options)
+    if pos is None:
+        try:
+            pos = nx.rescale_layout_dict(nx.planar_layout(nx_graph), scale=3)
+        except nx.NetworkXException:
+            pos = nx.shell_layout(nx_graph)
+        print(dict((k,tuple(round(i,2) for i in v)) for k,v in pos.items()))
+    latex = nx.drawing.to_latex_raw(nx_graph, pos=pos, **options)
+    lines = latex.split("\n")
+    if coding_pos is not None:
+        coding_text = f"      \\node[{LATEX_CODING_STYLE}] at {coding_pos} {_get_coding_text(coding)};\n"
+    else:
+        coding_text = ""
+    if insertfile is not None:
+        with open(os.path.join(var.LATEX_GRAPH_DIR, insertfile), "r") as f:
+            insert=f.read()
+    else:
+        insert=""
+    latex = f"""{begin or lines[0]}\n{coding_text}{f"      \\draw[{LATEX_NODES_STYLE}]"}\n{'\n'.join(lines[2:-2])}\n{insert}{end or '\n'.join(lines[-2:])}"""
+
+    with open(os.path.join(var.LATEX_GRAPH_DIR, filename), "w") as f:
+        f.write(f"%{coding}\n\n{latex}")
