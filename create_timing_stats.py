@@ -32,7 +32,7 @@ def _get_count(checks, classes, engines):
     return res
 
 
-def _get_avg(checks, classes, engines, properties=PROPS):
+def _get_avg(checks, classes, engines, properties):
     res = dict()
     for n, g_model in classes.items():
         print(f"\t{n}")
@@ -48,7 +48,7 @@ def _get_avg(checks, classes, engines, properties=PROPS):
             if checks["cert"]:
                 query = query.group_by(g_class.certificate)
             data = np.array(query.all()).transpose()
-            # print(data[0], data[1], data[2])
+            print(data[0], data[1], data[2])
             res[n] = dict((p, (np.mean(d), np.std(d))) for p, d in zip(properties, data))
     return res
 
@@ -56,7 +56,7 @@ def _get_avg(checks, classes, engines, properties=PROPS):
 # TIMES = ("subt+extr", "canon", "cert", "gap")
 
 
-def generate_combs(props=PROPS, d=None):
+def generate_combs(props, d=None):
     if len(props) == 0:
         yield d
         return
@@ -66,20 +66,22 @@ def generate_combs(props=PROPS, d=None):
         yield from generate_combs(props[1:], d)
 
 
-def run(n_range, k=2, weights=None, strategy="P", generator="h", calcs_indices=None):
+def run(n_range, k=2, weights=None, strategy="P", generator="h", calcs_indices=None, properties=PROPS, early_stop=True):
     weights = weights or (1,) * k
     models = dict((n, get_models(n, k, weights)) for n in n_range)
     calculator = Calculators(calcs_indices or dict())
     engines = dict(
         (n, initialize_database(c[0], c[1], n, k, weights, strategy, generator, calculator)) for n, c in models.items())
     data = dict()
-    for row in generate_combs():
+    for row in (dict((p, False) for p in properties),) if early_stop else generate_combs(props=properties):
         index = "".join(str(int(v)) for v in row.values())
         print(index)
-        data[index] = _get_avg(row, models, engines)
-    with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_timings.json"), 'w') as f:
+        data[index] = _get_avg(row, models, engines, properties=properties)
+    with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_{strategy}_timings.json"), 'w') as f:
         json.dump(data, f, indent=4)
 
+parser.add_argument("--no_early_stop", action="store_true")
+parser.add_argument("--properties", type=int, nargs="+", default=range(len(PROPS)))
 
 if __name__ == '__main__':
     init_logging(level=logging.TRACE)
@@ -90,4 +92,6 @@ if __name__ == '__main__':
     run(n_range=args.n, k=args.k[0], weights=args.weights,
         strategy=args.strategy.upper(), generator=args.generator.lower(),
         calcs_indices=calcs_indices,
+        properties=tuple(PROPS[i] for i in args.properties),
+        early_stop= not args.no_early_stop
         )
