@@ -48,7 +48,7 @@ def _get_avg(checks, classes, engines, properties):
             if checks["cert"]:
                 query = query.group_by(g_class.certificate)
             data = np.array(query.all()).transpose()
-            print(data[0], data[1], data[2])
+            # print(data[0], data[1], data[2])
             res[n] = dict((p, (np.mean(d), np.std(d))) for p, d in zip(properties, data))
     return res
 
