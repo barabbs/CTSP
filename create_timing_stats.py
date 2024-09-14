@@ -85,6 +85,6 @@ if __name__ == '__main__':
     calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
 
     args = parser.parse_args()
-    run(n_range=args.n, k=args.k, weights=args.weights,
+    run(n_range=args.n, k=args.k[0], weights=args.weights,
         strategy=args.strategy.upper(), generator=args.generator.lower(), calcs_indices=calcs_indices,
         )
