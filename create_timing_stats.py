@@ -65,10 +65,10 @@ def generate_combs(props=PROPS, d=None):
         yield from generate_combs(props[1:], d)
 
 
-def run(n_range, k=2, weights=None, strategy="P", generator="h", calc_indices=None):
+def run(n_range, k=2, weights=None, strategy="P", generator="h", calcs_indices=None):
     weights = weights or (1,) * k
     models = dict((n, get_models(n, k, weights)) for n in n_range)
-    calculator = Calculators(calc_indices or dict())
+    calculator = Calculators(calcs_indices or dict())
     engines = dict(
         (n, initialize_database(c[0], c[1], n, k, weights, strategy, generator, calculator)) for n, c in models.items())
     data = dict()
