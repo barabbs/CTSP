@@ -39,7 +39,7 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
             print(f"{n:>2}    {tot} graphs")
             for key, calc_class in CALCS.items():
                 progbar = manager.counter(total=tot, desc=f"key", leave=False)
-                print(f"\t{key:<16}", end="")
+                print(f"\t{key:<16}")
                 data = list()
                 calculator = calc_class(n=n, k=k, weights=weights)
                 for g in graphs:
@@ -48,7 +48,7 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
                     progbar.update()
                 progbar.close()
                 stat = (np.mean(data), np.std(data))
-                print(stat)
+                print(f"\t\t{stat}")
                 stats[n][key] = stat
                 with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_sample_timings_{samples}.json"),
                           'w') as f:
