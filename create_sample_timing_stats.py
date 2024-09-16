@@ -28,9 +28,10 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
     stats = dict()
     for n in n_range:
         metadata, models = get_models(n, k, weights)
+        gen = "m" if n == 12 else generator
         engine = initialize_database(metadata=metadata, models=models,
                                      n=n, k=k, weights=weights,
-                                     strategy=strategy, generator=generator, calculators=Calculators(calcs_indices))
+                                     strategy=strategy, generator=gen, calculators=Calculators(calcs_indices))
         stats[n] = dict()
         with (Session(engine) as session):
             statement = select(models[GRAPH]).order_by(models[GRAPH].gap.desc()).order_by(func.random()).limit(samples)
@@ -50,12 +51,11 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
                 stat = (np.mean(data), tuple(np.percentile(data, p) for p in range(0, 101, 5)))
                 print(f"\t\t{stat[0]}")
                 stats[n][key] = stat
-                with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_sample_timings_{samples}.json"),
+                with open(os.path.join(var.STATS_DIR,
+                                       f"{'-'.join(str(s) for s in n_range)}_sample_timings_{samples}.json"),
                           'w') as f:
                     json.dump(stats, f, indent=4)
     manager.stop()
-
-
 
 
 parser.add_argument("--samples", type=int, default=1000)
