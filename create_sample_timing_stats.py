@@ -50,7 +50,7 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
                 stat = (np.mean(data), np.std(data))
                 print(stat)
                 stats[n][key] = stat
-                with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_timings.json"),
+                with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_sample_timings_{samples}.json"),
                           'w') as f:
                     json.dump(stats, f, indent=4)
     manager.stop()
