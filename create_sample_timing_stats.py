@@ -48,7 +48,7 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
                     progbar.update()
                 progbar.close()
                 stat = (np.mean(data), tuple(np.percentile(data, p) for p in range(0, 101, 5)))
-                # print(f"\t\t{stat[0]}")
+                print(f"\t\t{stat[0]}")
                 stats[n][key] = stat
                 with open(os.path.join(var.STATS_DIR, f"{'-'.join(str(s) for s in n_range)}_sample_timings_{samples}.json"),
                           'w') as f:
