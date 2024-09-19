@@ -77,7 +77,7 @@ STRATEGIES_TABLE = f"""
     |              |
     
 """
-parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
+parser.add_argument("--strategy", type=str, default=var.DEFAULT_STRATEGY,
                     help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY})" + STRATEGIES_TABLE)
 
 GENERATORS_ROWS = '\n'.join(f" {k:<3}| {v['name']:<12} | {v['descr']}" for k, v in CODINGS_GENERATORS.items())
@@ -89,7 +89,7 @@ GENERATORS_TABLE = f"""
     |              |
 
 """
-parser.add_argument("-g", "--generator", type=str, default=var.DEFAULT_GENERATOR,
+parser.add_argument("--generator", type=str, default=var.DEFAULT_GENERATOR,
                     help=f"selected generator for computation, from the following (default: {var.DEFAULT_GENERATOR})" + GENERATORS_TABLE)
 
 for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP):
@@ -97,7 +97,7 @@ for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP):
     parser.add_argument(f"--{calc_type}", type=int, default=0,
                         help=f"selected calculation for {calc_type.upper()}, among the following (default: 0)\n" + CALC_ROWS + "\n\n")
 
-parser.add_argument("-d", "--delete", action="store_true",
+parser.add_argument("--delete", action="store_true",
                     help="delete and re-initialize databases\n\n")
 parser.add_argument("-v", "--verbose", action='count', default=0,
                     help="increase output verbosity\n\n")
