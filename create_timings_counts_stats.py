@@ -70,7 +70,7 @@ def _get_timings(session, models, **kwargs):
 
 
 def _get_timing_samples(session, models, n, k, weights, samples, manager, **kwargs):
-    statement = select(models[GRAPH]).order_by(models[GRAPH].gap.desc()).order_by(func.random()).limit(samples)
+    statement = select(models[GRAPH]).order_by(func.random()).limit(samples)
     graphs = session.scalars(statement).all()
     tot = len(graphs)
     print(f"\t{tot} graphs")

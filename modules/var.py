@@ -12,6 +12,7 @@ except FileExistsError:
     pass
 MODELS_DIR = os.path.join(DATA_DIR, 'models')
 DRAWINGS_DIR = os.path.join(DATA_DIR, "drawings", "k{k}_n{n}")
+SAMPLES_DIR = os.path.join(DATA_DIR, "samples", "k{k}_n{n}")
 LATEX_DIR = os.path.join(DATA_DIR, "latex")
 LATEX_GRAPH_DIR = os.path.join(LATEX_DIR, "graphs")
 LATEX_PLOTS_DIR = os.path.join(LATEX_DIR, "plots")
