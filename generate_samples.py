@@ -41,6 +41,7 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
                     f.write(f"{gr}\n\nn:   {n}\ngap: {gap}\n\n" +
                             "\n".join(f"{u},{v},{w}" for u, v, w in gr.edge_count_generator(weight=True)))
                 progbar.update()
+
         progbar.close()
     manager.stop()
 
