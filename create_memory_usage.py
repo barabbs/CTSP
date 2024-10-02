@@ -64,21 +64,22 @@ def get_process_memory_usage(pid, run_event, name):
         }, f, indent=var.RUN_INFO_INDENT)
     print("Done!")
 
+def
 
 def run(manager, samples=1000,
-        gurobi_quiet=True,
+        gurobi_verbose=False,
         gurobi_calcindex=(0, 0),
         gurobi_reset=0,
         gurobi_method=-1,
         gurobi_presolve=-1,
         gurobi_pre_sparsify=-1,
-        gurobi_threads=None,):
+        gurobi_threads=None, ):
+    name = f"C{gurobi_calcindex[0]}{gurobi_calcindex[1]}_R{str(gurobi_reset)[0]}_M{gurobi_method}_P{gurobi_presolve}_S{gurobi_pre_sparsify}_T{str(gurobi_threads)[0]}"
     print(
-        f"calc: {gurobi_calcindex}, reset: {gurobi_reset}, method: {gurobi_method}, presolve: {gurobi_presolve}, pre_sparsify: {gurobi_pre_sparsify}, threads: {gurobi_threads}")
+        f"calc: {gurobi_calcindex}, reset: {gurobi_reset}, method: {gurobi_method}, presolve: {gurobi_presolve}, pre_sparsify: {gurobi_pre_sparsify}, threads: {gurobi_threads}\nname: {name}\n" + "-"*64)
 
     with open(f"data/ram_usage/samples.json", 'r') as f:
         codings = json.load(f)
-    name = f"C{gurobi_calcindex[0]}{gurobi_calcindex[1]}_"
     graphs = tuple(Graph(n=N, k=K, weights=W, coding=c) for c in codings)
     run_event = multiprocessing.Event()
     cron_proc = multiprocessing.Process(target=get_process_memory_usage, args=(os.getpid(), run_event, name))
@@ -89,7 +90,7 @@ def run(manager, samples=1000,
     GAP_calc = GAP_calcs[gurobi_calcindex]
     checkpoints = list()
     start = time.time()
-    calculator = GAP_calc(n=N, k=K, w=W, gurobi_verbose=not gurobi_quiet,
+    calculator = GAP_calc(n=N, k=K, w=W, gurobi_verbose=gurobi_verbose,
                           gurobi_reset=gurobi_reset,
                           gurobi_method=gurobi_method,
                           gurobi_presolve=gurobi_presolve,
@@ -148,7 +149,7 @@ def generate(samples=1000, generator=var.DEFAULT_GENERATOR, calcs_indices=None):
 parser.add_argument("-g", "--generate", action="store_true")
 parser.add_argument("-s", "--samples", type=int, default=1000),
 
-parser.add_argument("--gurobi_quiet", action="store_true",
+parser.add_argument("--gurobi_verbose", action="store_true",
                     help="verbosity of integrality gap optimizer gurobi\n\n")
 parser.add_argument("--gurobi_reset", type=int, nargs="+", default=(var.GUROBI_RESET,),
                     help=f"reset level of gurobi model in-between instances\n\n")
@@ -167,13 +168,13 @@ parser.add_argument("--gurobi_bound", type=int, nargs="+", default=(1,),
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    init_logging(level=logging.TRACE)
     if args.generate:
+        init_logging(level=logging.TRACE)
         calcs_indices = dict(
             (calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
         generate(samples=args.samples, calcs_indices=calcs_indices)
     else:
-
+        init_logging(level=logging.WARNING)
         manager = enlighten.get_manager()
         for r in args.gurobi_reset:
             for m in args.gurobi_method:
@@ -184,7 +185,7 @@ if __name__ == '__main__':
                                 for b in args.gurobi_bound:
                                     run(manager=manager,
                                         samples=args.samples,
-                                        gurobi_quiet=args.gurobi_quiet,
+                                        gurobi_verbose=args.gurobi_verbose,
                                         gurobi_calcindex=(c, b),
                                         gurobi_reset=r if r >= 0 else None,
                                         gurobi_method=m,
