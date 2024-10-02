@@ -64,7 +64,6 @@ def get_process_memory_usage(pid, run_event, name):
         }, f, indent=var.RUN_INFO_INDENT)
     print("Done!")
 
-def
 
 def run(manager, samples=1000,
         gurobi_verbose=False,
@@ -76,7 +75,7 @@ def run(manager, samples=1000,
         gurobi_threads=None, ):
     name = f"C{gurobi_calcindex[0]}{gurobi_calcindex[1]}_R{str(gurobi_reset)[0]}_M{gurobi_method}_P{gurobi_presolve}_S{gurobi_pre_sparsify}_T{str(gurobi_threads)[0]}"
     print(
-        f"calc: {gurobi_calcindex}, reset: {gurobi_reset}, method: {gurobi_method}, presolve: {gurobi_presolve}, pre_sparsify: {gurobi_pre_sparsify}, threads: {gurobi_threads}\nname: {name}\n" + "-"*64)
+        f"calc: {gurobi_calcindex}, reset: {gurobi_reset}, method: {gurobi_method}, presolve: {gurobi_presolve}, pre_sparsify: {gurobi_pre_sparsify}, threads: {gurobi_threads}\nname: {name}\n" + "-" * 64)
 
     with open(f"data/ram_usage/samples.json", 'r') as f:
         codings = json.load(f)
