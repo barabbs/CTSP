@@ -149,8 +149,8 @@ parser.add_argument("-n", type=int, default=10),
 parser.add_argument("-g", "--generate", action="store_true")
 parser.add_argument("-s", "--samples", type=int, default=1000),
 
-# parser.add_argument("--gurobi_verbose", action="store_true",
-#                     help="verbosity of integrality gap optimizer gurobi\n\n")
+parser.add_argument("--gurobi_verbose", action="store_true",
+                    help="verbosity of integrality gap optimizer gurobi\n\n")
 # parser.add_argument("--gurobi_reset", type=int, nargs="+", default=(var.GUROBI_RESET,),
 #                     help=f"reset level of gurobi model in-between instances\n\n")
 # parser.add_argument("--gurobi_method", type=int, nargs="+", default=(var.GUROBI_METHOD,),
