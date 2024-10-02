@@ -191,24 +191,23 @@ if __name__ == '__main__':
     else:
         init_logging(level=logging.WARNING)
         manager = enlighten.get_manager()
-        for r in args.gurobi_reset:
-            for m in args.gurobi_method:
-                for p in args.gurobi_presolve:
-                    for s in args.gurobi_pre_sparsify:
-                        for t in args.gurobi_threads:
-                            for c in args.gurobi_calc:
-                                for b in args.gurobi_bound:
-                                    run(n=args.n, manager=manager,
-                                        samples=args.samples,
-                                        gurobi_verbose=args.gurobi_verbose,
-                                        gurobi_calcindex=(c, b),
-                                        gurobi_reset=r if r >= 0 else None,
-                                        gurobi_method=m,
-                                        gurobi_presolve=p,
-                                        gurobi_pre_sparsify=s,
-                                        gurobi_threads=t
-                                        )
-
+        # for r in args.gurobi_reset:
+        #     for m in args.gurobi_method:
+        #         for p in args.gurobi_presolve:
+        #             for s in args.gurobi_pre_sparsify:
+        #                 for t in args.gurobi_threads:
+        #                     for c in args.gurobi_calc:
+        #                         for b in args.gurobi_bound:
+        #                             run(n=args.n, manager=manager,
+        #                                 samples=args.samples,
+        #                                 gurobi_verbose=args.gurobi_verbose,
+        #                                 gurobi_calcindex=(c, b),
+        #                                 gurobi_reset=r if r >= 0 else None,
+        #                                 gurobi_method=m,
+        #                                 gurobi_presolve=p,
+        #                                 gurobi_pre_sparsify=s,
+        #                                 gurobi_threads=t
+        #                                 )
         run(n=args.n, manager=manager,
             samples=args.samples,
             gurobi_verbose=args.gurobi_verbose,
