@@ -15,7 +15,7 @@ from main import init_logging
 import enlighten
 import argparse, logging
 
-N, K, W = 11, 2, (1, 1)
+K, W = 2, (1, 1)
 
 GAP_calcs = {(0, 0): GAP_Gurobi,
              (0, 1): GAP_Gurobi_Bound,
@@ -65,7 +65,7 @@ def get_process_memory_usage(pid, run_event, name):
     print("Done!")
 
 
-def run(manager, samples=1000,
+def run(manager, n, samples=1000,
         gurobi_verbose=False,
         gurobi_calcindex=(0, 0),
         gurobi_reset=0,
@@ -77,9 +77,9 @@ def run(manager, samples=1000,
     print(
         f"calc: {gurobi_calcindex}, reset: {gurobi_reset}, method: {gurobi_method}, presolve: {gurobi_presolve}, pre_sparsify: {gurobi_pre_sparsify}, threads: {gurobi_threads}\nname: {name}\n" + "-" * 64)
 
-    with open(f"data/ram_usage/samples.json", 'r') as f:
+    with open(f"data/ram_usage/samples_n{n}.json", 'r') as f:
         codings = json.load(f)
-    graphs = tuple(Graph(n=N, k=K, weights=W, coding=c) for c in codings)
+    graphs = tuple(Graph(n=n, k=K, weights=W, coding=c) for c in codings)
     run_event = multiprocessing.Event()
     cron_proc = multiprocessing.Process(target=get_process_memory_usage, args=(os.getpid(), run_event, name))
     cron_proc.start()
@@ -89,7 +89,7 @@ def run(manager, samples=1000,
     GAP_calc = GAP_calcs[gurobi_calcindex]
     checkpoints = list()
     start = time.time()
-    calculator = GAP_calc(n=N, k=K, w=W, gurobi_verbose=gurobi_verbose,
+    calculator = GAP_calc(n=n, k=K, w=W, gurobi_verbose=gurobi_verbose,
                           gurobi_reset=gurobi_reset,
                           gurobi_method=gurobi_method,
                           gurobi_presolve=gurobi_presolve,
@@ -128,11 +128,11 @@ def run(manager, samples=1000,
     return history, checkpoints
 
 
-def generate(samples=1000, generator=var.DEFAULT_GENERATOR, calcs_indices=None):
-    metadata, models = get_models(N, K, W)
+def generate(n, samples=1000, generator=var.DEFAULT_GENERATOR, calcs_indices=None):
+    metadata, models = get_models(n, K, W)
     g_mod = models[GRAPH]
     engine = initialize_database(metadata=metadata, models=models,
-                                 n=N, k=K, weights=W,
+                                 n=n, k=K, weights=W,
                                  strategy=var.DEFAULT_STRATEGY, generator=generator,
                                  calculators=Calculators(calcs_indices))
     with (Session(engine) as session):
@@ -141,10 +141,11 @@ def generate(samples=1000, generator=var.DEFAULT_GENERATOR, calcs_indices=None):
         codings = tuple(session.scalars(statement).all())
         print(f"Saving {len(codings)} samples...")
 
-        with open(f"data/ram_usage/samples.json", 'w') as f:
+        with open(f"data/ram_usage/samples_n{n}.json", 'w') as f:
             json.dump(codings, f)
 
 
+parser.add_argument("-n", type=int, default=10),
 parser.add_argument("-g", "--generate", action="store_true")
 parser.add_argument("-s", "--samples", type=int, default=1000),
 
@@ -171,7 +172,7 @@ if __name__ == '__main__':
         init_logging(level=logging.TRACE)
         calcs_indices = dict(
             (calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
-        generate(samples=args.samples, calcs_indices=calcs_indices)
+        generate(n=args.n, samples=args.samples, calcs_indices=calcs_indices)
     else:
         init_logging(level=logging.WARNING)
         manager = enlighten.get_manager()
@@ -182,7 +183,7 @@ if __name__ == '__main__':
                         for t in args.gurobi_threads:
                             for c in args.gurobi_calc:
                                 for b in args.gurobi_bound:
-                                    run(manager=manager,
+                                    run(n=args.n, manager=manager,
                                         samples=args.samples,
                                         gurobi_verbose=args.gurobi_verbose,
                                         gurobi_calcindex=(c, b),
