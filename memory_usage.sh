@@ -6,8 +6,6 @@ python create_memory_usage.py  -n 10 --samples 1000 --gurobi_method 1;
 pkill -f python*;
 python create_memory_usage.py  -n 10 --samples 1000 --gurobi_method 2;
 pkill -f python*;
-python create_memory_usage.py  -n 10 --samples 1000 --gurobi_method 2;
-pkill -f python*;
 python create_memory_usage.py  -n 10 --samples 1000 --gurobi_presolve 0 --gurobi_pre_sparsify 0;
 pkill -f python*;
 python create_memory_usage.py  -n 10 --samples 1000 --gurobi_presolve 0 --gurobi_pre_sparsify 2;
