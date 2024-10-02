@@ -149,21 +149,36 @@ parser.add_argument("-n", type=int, default=10),
 parser.add_argument("-g", "--generate", action="store_true")
 parser.add_argument("-s", "--samples", type=int, default=1000),
 
-parser.add_argument("--gurobi_verbose", action="store_true",
-                    help="verbosity of integrality gap optimizer gurobi\n\n")
-parser.add_argument("--gurobi_reset", type=int, nargs="+", default=(var.GUROBI_RESET,),
+# parser.add_argument("--gurobi_verbose", action="store_true",
+#                     help="verbosity of integrality gap optimizer gurobi\n\n")
+# parser.add_argument("--gurobi_reset", type=int, nargs="+", default=(var.GUROBI_RESET,),
+#                     help=f"reset level of gurobi model in-between instances\n\n")
+# parser.add_argument("--gurobi_method", type=int, nargs="+", default=(var.GUROBI_METHOD,),
+#                     help=f"gurobi Method parameter\n\n")
+# parser.add_argument("--gurobi_presolve", type=int, nargs="+", default=(var.GUROBI_PRESOLVE,),
+#                     help=f"gurobi Presolve parameter\n\n")
+# parser.add_argument("--gurobi_pre_sparsify", type=int, nargs="+", default=(var.GUROBI_PRE_SPARSIFY,),
+#                     help=f"gurobi PreSparsify parameter\n\n")
+# parser.add_argument("--gurobi_threads", type=int, nargs="+", default=(var.GUROBI_THREADS,),
+#                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
+# parser.add_argument("--gurobi_calc", type=int, nargs="+", default=(1,),
+#                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
+# parser.add_argument("--gurobi_bound", type=int, nargs="+", default=(1,),
+#                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
+
+parser.add_argument("--gurobi_reset", type=int, default=var.GUROBI_RESET,
                     help=f"reset level of gurobi model in-between instances\n\n")
-parser.add_argument("--gurobi_method", type=int, nargs="+", default=(var.GUROBI_METHOD,),
+parser.add_argument("--gurobi_method", type=int, default=var.GUROBI_METHOD,
                     help=f"gurobi Method parameter\n\n")
-parser.add_argument("--gurobi_presolve", type=int, nargs="+", default=(var.GUROBI_PRESOLVE,),
+parser.add_argument("--gurobi_presolve", type=int, default=var.GUROBI_PRESOLVE,
                     help=f"gurobi Presolve parameter\n\n")
-parser.add_argument("--gurobi_pre_sparsify", type=int, nargs="+", default=(var.GUROBI_PRE_SPARSIFY,),
+parser.add_argument("--gurobi_pre_sparsify", type=int, default=var.GUROBI_PRE_SPARSIFY,
                     help=f"gurobi PreSparsify parameter\n\n")
-parser.add_argument("--gurobi_threads", type=int, nargs="+", default=(var.GUROBI_THREADS,),
+parser.add_argument("--gurobi_threads", type=int, default=var.GUROBI_THREADS,
                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
-parser.add_argument("--gurobi_calc", type=int, nargs="+", default=(1,),
+parser.add_argument("--gurobi_calc", type=int, default=1,
                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
-parser.add_argument("--gurobi_bound", type=int, nargs="+", default=(1,),
+parser.add_argument("--gurobi_bound", type=int, default=1,
                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
 
 if __name__ == '__main__':
@@ -194,4 +209,14 @@ if __name__ == '__main__':
                                         gurobi_threads=t
                                         )
 
+        run(n=args.n, manager=manager,
+            samples=args.samples,
+            gurobi_verbose=args.gurobi_verbose,
+            gurobi_calcindex=(args.gurobi_calc, args.gurobi_bound),
+            gurobi_reset=args.gurobi_reset if args.gurobi_reset >= 0 else None,
+            gurobi_method=args.gurobi_method,
+            gurobi_presolve=args.gurobi_presolve,
+            gurobi_pre_sparsify=args.gurobi_pre_sparsify,
+            gurobi_threads=args.gurobi_threads
+            )
         manager.stop()
