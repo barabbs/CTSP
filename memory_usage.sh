@@ -29,4 +29,3 @@ pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 2 --gurobi_bound 0;
 pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 2 --gurobi_bound 1;
-pkill -f python*;
