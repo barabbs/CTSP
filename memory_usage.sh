@@ -10,8 +10,6 @@ python create_memory_usage.py  -n 11 --samples 100 --gurobi_presolve 0 --gurobi_
 pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_presolve 0 --gurobi_pre_sparsify 2;
 pkill -f python*;
-python create_memory_usage.py  -n 11 --samples 100 --gurobi_presolve 1 --gurobi_pre_sparsify 0;
-pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_presolve 1 --gurobi_pre_sparsify 2;
 pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_presolve 2 --gurobi_pre_sparsify 0;
@@ -24,8 +22,7 @@ python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 0 --gurobi_boun
 pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 1 --gurobi_bound 0;
 pkill -f python*;
-python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 1 --gurobi_bound 1;
-pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 2 --gurobi_bound 0;
 pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_calc 2 --gurobi_bound 1;
+pkill -f python*;
