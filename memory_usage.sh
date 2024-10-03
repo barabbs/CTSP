@@ -1,5 +1,5 @@
-python create_memory_usage.py  -n 11 --samples 100 --gurobi_method -1;
-pkill -f python*;
+#python create_memory_usage.py  -n 11 --samples 100 --gurobi_method -1;
+#pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_method 0;
 pkill -f python*;
 python create_memory_usage.py  -n 11 --samples 100 --gurobi_method 1;
