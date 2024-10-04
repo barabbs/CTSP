@@ -103,14 +103,17 @@ def run(manager, n, samples=1000,
     progbar = manager.counter(total=samples, desc=name, leave=False)
     print(f"\tRUNNING")
     times = list()
-    for graph in graphs[:samples] if samples is not None else graphs:
-        checkpoints.append(time.time() - start)
-        res = calculator.calc(graph)
-        times.append(next(iter(res['timings'].values())))
-        progbar.update()
-        if time.time() - start >= 7200:
-            print(f"\tTIMEOUT: completed {progbar.count}")
-            break
+    try:
+        for graph in graphs[:samples] if samples is not None else graphs:
+            checkpoints.append(time.time() - start)
+            res = calculator.calc(graph)
+            times.append(next(iter(res['timings'].values())))
+            progbar.update()
+            if time.time() - start >= 7200:
+                print(f"\tTIMEOUT: completed {progbar.count}")
+                break
+    except KeyboardInterrupt:
+        print(f"\tINTERRUPT: completed {progbar.count}")
     progbar.close()
     print(f"\t\t{np.mean(times):>.2e} ± {np.std(times):>.2e}    {res['graphs']}")
 
