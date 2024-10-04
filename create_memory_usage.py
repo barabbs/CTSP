@@ -108,8 +108,9 @@ def run(manager, n, samples=1000,
         res = calculator.calc(graph)
         times.append(next(iter(res['timings'].values())))
         progbar.update()
-        if time.time() - start >= 60 * 60:
+        if time.time() - start >= 7200:
             print(f"\tTIMEOUT: completed {progbar.count}")
+            break
     progbar.close()
     print(f"\t\t{np.mean(times):>.2e} ± {np.std(times):>.2e}    {res['graphs']}")
 
