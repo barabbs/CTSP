@@ -37,7 +37,7 @@ MEMORY_ATTRS = (
     "data",
     # "dirty"
 )
-TIME_INTERVAL = 0.1
+TIME_INTERVAL = 0.01
 
 
 def get_process_memory_usage(pid, run_event, name):
