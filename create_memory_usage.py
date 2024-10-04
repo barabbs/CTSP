@@ -47,16 +47,19 @@ def get_process_memory_usage(pid, run_event, name):
     for attr in MEMORY_ATTRS:
         history[attr] = list()
     run_event.wait()
-    start = time.time()
+    last_time = start = time.time()
     while run_event.is_set():
-        last_time = time.time()
         # print(f"{last_time - start:3.2f}")
         processes = filter(lambda p: p != my_process, (parent_process, *parent_process.children(recursive=True)))
         infos = tuple(proc.memory_info() for proc in processes)
 
         for k, v in history.items():
             v.append(sum(getattr(i, k, 0) for i in infos) / 1073741824)
-        time.sleep(TIME_INTERVAL - time.time() + last_time)
+        last_time += TIME_INTERVAL
+        try:
+            time.sleep(last_time - time.time())
+        except ValueError:
+            print("skipped")
     print(f"Saving history to {name}.json...", end="\t")
     with open(f"data/ram_usage/{name}.json", 'w') as f:
         json.dump({
