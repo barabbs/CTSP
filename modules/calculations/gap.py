@@ -231,12 +231,12 @@ class GAP_Gurobi_Laziest_Bound(GAP_Gurobi_Laziest, GAP_Gurobi_Bound):
     CALC_NAME = "Gurobi Laziest w/ Bound"
 
 CALCULATIONS_LIST = (
-    GAP_Gurobi_Lazy_Bound,
     GAP_Gurobi_Lazy,
-    GAP_Gurobi_Laziest_Bound,
+    GAP_Gurobi_Lazy_Bound,
     GAP_Gurobi_Laziest,
-    GAP_Gurobi_Bound,
+    GAP_Gurobi_Laziest_Bound,
     GAP_Gurobi,
+    GAP_Gurobi_Bound,
     # GAP_Gurobi_Bound_Constr,
 )
 
