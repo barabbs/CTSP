@@ -187,7 +187,7 @@ parser.add_argument("--gurobi_threads", type=int, default=var.GUROBI_THREADS,
                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
 parser.add_argument("--gurobi_calc", type=int, default=1,
                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
-parser.add_argument("--gurobi_bound", type=int, default=1,
+parser.add_argument("--gurobi_bound", type=int, default=0,
                     help=f"gurobi Threads parameter, number of threads for gurobi\n\n")
 
 if __name__ == '__main__':
