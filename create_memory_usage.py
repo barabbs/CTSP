@@ -37,7 +37,7 @@ MEMORY_ATTRS = (
     "data",
     # "dirty"
 )
-TIME_INTERVAL = 0.02
+TIME_INTERVAL = 0.1
 
 
 def get_process_memory_usage(pid, run_event, name):
@@ -130,6 +130,7 @@ def run(manager, n, samples=1000,
 
     with open(f"data/ram_usage/{name}.json", 'w') as f:
         json.dump({
+            "time_interval": TIME_INTERVAL,
             "history": history,
             "checkpoints": checkpoints
         }, f)
