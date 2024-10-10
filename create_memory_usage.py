@@ -37,7 +37,7 @@ MEMORY_ATTRS = (
     "data",
     # "dirty"
 )
-TIME_INTERVALS = (0.02, 0.1)
+TIME_INTERVALS = 0.02, 0.1
 
 
 def get_process_memory_usage(pid, run_event, name, time_interval):
@@ -118,6 +118,7 @@ def run(manager, n, samples=1000,
                 break
     except KeyboardInterrupt:
         print(f"\tINTERRUPT: completed {progbar.count}")
+    end = time.time() - start
     progbar.close()
     print(f"\t\t{np.mean(times):>.2e} ± {np.std(times):>.2e}    {res['graphs']}")
 
@@ -133,7 +134,8 @@ def run(manager, n, samples=1000,
         json.dump({
             "time_interval": time_interval,
             "history": history,
-            "checkpoints": checkpoints
+            "checkpoints": checkpoints,
+            "end": end
         }, f)
 
     return history, checkpoints
