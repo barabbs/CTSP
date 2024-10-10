@@ -37,10 +37,10 @@ MEMORY_ATTRS = (
     "data",
     # "dirty"
 )
-TIME_INTERVAL = 0.1
+TIME_INTERVALS = (0.02, 0.1)
 
 
-def get_process_memory_usage(pid, run_event, name):
+def get_process_memory_usage(pid, run_event, name, time_interval):
     parent_process = psutil.Process(pid)
     my_process = psutil.Process()
     history = dict()
@@ -55,7 +55,7 @@ def get_process_memory_usage(pid, run_event, name):
 
         for k, v in history.items():
             v.append(sum(getattr(i, k, 0) for i in infos) / 1073741824)
-        last_time += TIME_INTERVAL
+        last_time += time_interval
         try:
             time.sleep(last_time - time.time())
         except ValueError:
@@ -79,12 +79,13 @@ def run(manager, n, samples=1000,
     name = f"n{n}_C{gurobi_calcindex[0]}{gurobi_calcindex[1]}_R{str(gurobi_reset)[0]}_M{gurobi_method}_P{gurobi_presolve}_S{gurobi_pre_sparsify}_T{str(gurobi_threads)[0]}"
     print("-" * 80 +
           f"\ncalc: {gurobi_calcindex}, reset: {gurobi_reset}, method: {gurobi_method}, presolve: {gurobi_presolve}, pre_sparsify: {gurobi_pre_sparsify}, threads: {gurobi_threads}\nname: {name}\n" + "-" * 80)
+    time_interval = TIME_INTERVALS[0 if n < 11 else 1]
 
     with open(f"data/ram_usage/samples_n{n}.json", 'r') as f:
         codings = json.load(f)
     graphs = tuple(Graph(n=n, k=K, weights=W, coding=c) for c in codings)
     run_event = multiprocessing.Event()
-    cron_proc = multiprocessing.Process(target=get_process_memory_usage, args=(os.getpid(), run_event, name))
+    cron_proc = multiprocessing.Process(target=get_process_memory_usage, args=(os.getpid(), run_event, name, time_interval))
     cron_proc.start()
     time.sleep(1)
     run_event.set()
@@ -130,7 +131,7 @@ def run(manager, n, samples=1000,
 
     with open(f"data/ram_usage/{name}.json", 'w') as f:
         json.dump({
-            "time_interval": TIME_INTERVAL,
+            "time_interval": time_interval,
             "history": history,
             "checkpoints": checkpoints
         }, f)
