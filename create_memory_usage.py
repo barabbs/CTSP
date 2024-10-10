@@ -138,9 +138,10 @@ def run(manager, n, samples=1000,
     return history, checkpoints
 
 
-def generate(n, samples=1000, generator=var.DEFAULT_GENERATOR, calcs_indices=None):
+def generate(n, samples=1000, generator=None, calcs_indices=None):
     metadata, models = get_models(n, K, W)
     g_mod = models[GRAPH]
+    generator = generator or (var.DEFAULT_GENERATOR if n <= 12 else "m")
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=K, weights=W,
                                  strategy=var.DEFAULT_STRATEGY, generator=generator,
