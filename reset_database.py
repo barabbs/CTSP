@@ -9,6 +9,14 @@ from modules.models import get_models, GRAPH, TIMINGS
 from sqlalchemy.orm import Session
 from sqlalchemy import func, update
 
+import logging
+from functools import partial, partialmethod
+
+logging.TRACE = 18
+logging.addLevelName(logging.TRACE, 'TRACE')
+logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
+logging.trace = partial(logging.log, logging.TRACE)
+
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
 parser.add_argument("-n", type=int,
@@ -34,11 +42,10 @@ if __name__ == '__main__':
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights,
-                                 strategy=strategy, generator=generator, calculators=calculators,)
+                                 strategy=strategy, generator=generator, calculators=calculators, )
     with Session(engine) as session:
         print(f"Total  {session.query(models[GRAPH]).count()}")
         print(f"Null   {session.query(models[GRAPH]).where(models[GRAPH].gap.is_(None)).count()}")
         session.execute(update(models[GRAPH]).values(gap=None))
         session.commit()
         print(f"New    {session.query(models[GRAPH]).where(models[GRAPH].gap.is_(None)).count()}")
-
