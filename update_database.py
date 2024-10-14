@@ -49,7 +49,6 @@ def update_database_old(n, k=2, weights=None, donor=None, recip=None):
 
 def update_database(n, k=2, weights=None, donor=None, recip=None):
     print(f"Updating {recip} with {donor}")
-    manager = enlighten.get_manager()
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
     g_mod = models[GRAPH]
@@ -62,23 +61,18 @@ def update_database(n, k=2, weights=None, donor=None, recip=None):
             ).where(
                 g_mod.prop_subt.is_not(None)
             )).all()
-            total = len(don_graphs)
-            progbar = manager.counter(total=total, desc=f"Updating...", leave=False)
-            for cert, prop_subt, prop_extr, gap in don_graphs:
-                # print(cert)
-                rec_sess.execute(update(g_mod).where(g_mod.certificate == bindparam("cert")),
-                                 ({
-                                      "cert": cert,
-                                      "prop_subt": prop_subt,
-                                      "prop_extr": prop_extr,
-                                      "gap": gap
-                                  },)
-                                 )
-                progbar.update()
+            print(f"\nfound {len(don_graphs)} certificates")
+            # print(cert)
+            rec_sess.execute(update(g_mod).where(g_mod.certificate == bindparam("cert")),
+                             tuple({
+                                       "cert": cert,
+                                       "prop_subt": prop_subt,
+                                       "prop_extr": prop_extr,
+                                       "gap": gap
+                                   } for cert, prop_subt, prop_extr, gap in don_graphs)
+                             )
             rec_sess.commit()
-    progbar.close()
     print(f"Updated!")
-    manager.stop()
 
 
 if __name__ == '__main__':
