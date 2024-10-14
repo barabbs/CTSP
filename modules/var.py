@@ -11,16 +11,16 @@ try:
 except FileExistsError:
     pass
 MODELS_DIR = os.path.join(DATA_DIR, 'models')
-DRAWINGS_DIR = os.path.join(DATA_DIR, "drawings", "k{k}_n{n}")
-SAMPLES_DIR = os.path.join(DATA_DIR, "samples", "k{k}_n{n}")
+DRAWINGS_DIR = os.path.join(DATA_DIR, "drawings", "k{k}_n{n:02d}")
+SAMPLES_DIR = os.path.join(DATA_DIR, "samples", "k{k}_n{n:02d}")
 LATEX_DIR = os.path.join(DATA_DIR, "latex")
 LATEX_GRAPH_DIR = os.path.join(LATEX_DIR, "graphs")
 LATEX_PLOTS_DIR = os.path.join(LATEX_DIR, "plots")
 DATABASE_DIR = os.path.join(DATA_DIR, "databases")
 STATS_DIR = os.path.join(DATA_DIR, "stats")
-DATABASE_FILEPATH = os.path.join(DATABASE_DIR, "graphs_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.cgdb")
-RUN_INFO_FILEPATH = os.path.join(DATABASE_DIR, "run_k{k}_n{n}_w{weights}_{generator}{calculators}{strategy}.json")
-GENERATOR_SETTINGS_FILEPATH = os.path.join(GENERATOR_SETTINGS_DIR, "generator_settings_k{k}_n{n}.json")
+DATABASE_FILEPATH = os.path.join(DATABASE_DIR, "k{k}_n{n:02d}_w{weights}_{generator}{calculators}{strategy}.cgdb")
+RUN_INFO_FILEPATH = os.path.join(DATABASE_DIR, "k{k}_n{n:02d}_w{weights}_{generator}{calculators}{strategy}.json")
+GENERATOR_SETTINGS_FILEPATH = os.path.join(GENERATOR_SETTINGS_DIR, "generator_settings_k{k}_n{n:02d}.json")
 BEST_GAPS_FILEPATH = os.path.join(DATA_DIR, "best_gaps.json")
 RUN_INFO_INDENT = 4
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
