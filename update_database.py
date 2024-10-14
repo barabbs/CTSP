@@ -4,6 +4,8 @@ from sqlalchemy import create_engine, select, insert, update, bindparam, func
 from sqlalchemy.orm import Session
 from modules.models import get_models, GRAPH, TIMINGS
 
+STEP = 1000
+
 
 def update_database_old(n, k=2, weights=None, donor=None, recip=None):
     print(f"Updating {recip} with {donor}")
@@ -18,35 +20,45 @@ def update_database_old(n, k=2, weights=None, donor=None, recip=None):
             rec_graphs = rec_sess.execute(select(g_mod.coding, g_mod.certificate)).all()
             total = len(rec_graphs)
             progbar = manager.counter(total=total, desc=f"Updating...", leave=False)
-            updated = 0
+            updated, to_update = 0, list()
             for coding, cert in rec_graphs:
-                print(coding, cert)
                 don_graph = don_sess.execute(
                     select(
-                        g_mod.prop_subt, g_mod.prop_extr
+                        g_mod.prop_subt, g_mod.prop_extr, g_mod.gap
                     ).where(
                         g_mod.certificate.is_(cert), g_mod.prop_subt.is_not(None)
                     )
                 ).one_or_none()
-                print(don_graph)
                 if don_graph is None:
                     progbar.update()
                     continue
-                rec_sess.execute(update(g_mod).where(g_mod.coding == bindparam("id")),
-                                 ({
-                                      "id": coding,
-                                      "prop_subt": don_graph[0],
-                                      "prop_extr": don_graph[1],
-                                  },)
-                                 )
-                progbar.update()
+                to_update.append({
+                    "id": coding,
+                    "prop_subt": don_graph[0],
+                    "prop_extr": don_graph[1],
+                    "gap": don_graph[2]
+                })
                 updated += 1
+                progbar.update()
+                if updated % STEP == 0:
+                    print("\tCommitting...", end="")
+                    rec_sess.execute(update(g_mod).where(g_mod.coding == bindparam("id")),
+                                     to_update
+                                 )
+                    rec_sess.commit()
+                    to_update = list()
+                    print("Done")
+            print("\tCommitting...", end="")
+            rec_sess.execute(update(g_mod).where(g_mod.coding == bindparam("id")),
+                             to_update
+                         )
             rec_sess.commit()
+            print("Done")
     progbar.close()
     print(f"Updated {updated} out of {total}")
     manager.stop()
 
-STEP = 1000
+
 def update_database(n, k=2, weights=None, donor=None, recip=None):
     print(f"Updating {recip} with {donor}")
     manager = enlighten.get_manager()
