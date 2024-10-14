@@ -166,7 +166,7 @@ if __name__ == '__main__':
     from modules.graph import Graph
 
     print("  N      FULL      HALF  [expect]  ( perc )\n--------------------------------------------")
-    for n in range(6, 12):
+    for n in range(4, 12):
         full = tuple(full_codings_generator(n))
         full_i = 0
         # for c, _ in full:
