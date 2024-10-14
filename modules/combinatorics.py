@@ -36,14 +36,17 @@ def full_codings_generator(n, k=2):
     if not k == 2:
         raise NotImplemented
     nodes = tuple(range(n))
-    partitions = tuple(partition(n, maximum=n, minimum=2))
+    partitions = tuple(partition(n, minimum=2))
     for i_p, p_1 in enumerate(partitions):
         c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
         for p_2 in partitions[i_p:]:
+            if p_2 == (n,):
+                continue
             for c_2 in cycles(frozenset(nodes), p_2):
                 yield (c_1, c_2), (p_1, p_2)
     partition.cache_clear()
     cycles.cache_clear()
+
 
 @cache
 def get_non_integer(head, succ, part):
@@ -53,7 +56,7 @@ def get_non_integer(head, succ, part):
         n_head = (head[0], *chunk)
         if all(n_head[(i + 1) % part] != succ[v] for i, v in enumerate(n_head)):
             # print(f"\t\t\t{n_head} - YES")
-            n_heads += (n_head, )
+            n_heads += (n_head,)
         # else:
         #     print(f"\t\t\t{n_head} - NO")
     return n_heads
@@ -81,12 +84,14 @@ def half_codings_generator(n, k=2):
     if not k == 2:
         raise NotImplemented
     nodes = tuple(range(n))
-    partitions = tuple(partition(n, maximum=n, minimum=2))
+    partitions = tuple(partition(n, minimum=2))
     for i_p, p_1 in enumerate(partitions):
         c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
         succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
         # print(f"{c_1} - {succ}")
         for p_2 in partitions[i_p:]:
+            if p_2 == (n,):
+                continue
             # print(f"\t{p_2}")
             for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
                 # print(f"\t\t{c_2}")
@@ -159,6 +164,7 @@ COMPARISON OF GENERATED INSTANCES BY FULL AND HALF GENERATORS
 
 if __name__ == '__main__':
     from modules.graph import Graph
+
     print("  N      FULL      HALF  [expect]  ( perc )\n--------------------------------------------")
     for n in range(6, 12):
         full = tuple(full_codings_generator(n))
