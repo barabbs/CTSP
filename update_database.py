@@ -84,4 +84,4 @@ def update_database(n, k=2, weights=None, donor=None, recip=None):
 
 
 if __name__ == '__main__':
-    update_database(n=11, donor="k2_n11_w1-1_h00001.cgdb", recip="k2_n11_w1-1_m00001.cgdb")
+    update_database_old(n=11, donor="k2_n11_w1-1_h00001.cgdb", recip="k2_n11_w1-1_m00001.cgdb")
