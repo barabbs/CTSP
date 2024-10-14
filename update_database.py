@@ -46,14 +46,15 @@ def update_database_old(n, k=2, weights=None, donor=None, recip=None):
     print(f"Updated {updated} out of {total}")
     manager.stop()
 
-
+STEP = 1000
 def update_database(n, k=2, weights=None, donor=None, recip=None):
     print(f"Updating {recip} with {donor}")
+    manager = enlighten.get_manager()
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
     g_mod = models[GRAPH]
-    don_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, donor)}")
-    rec_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, recip)}")
+    don_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, donor)}", echo=True)
+    rec_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, recip)}", echo=True)
     with (Session(don_eng) as don_sess):
         with Session(rec_eng) as rec_sess:
             don_graphs = don_sess.execute(select(
@@ -61,18 +62,25 @@ def update_database(n, k=2, weights=None, donor=None, recip=None):
             ).where(
                 g_mod.prop_subt.is_not(None)
             )).all()
-            print(f"\nfound {len(don_graphs)} certificates")
-            # print(cert)
-            rec_sess.execute(update(g_mod).where(g_mod.certificate == bindparam("cert")),
-                             tuple({
-                                       "cert": cert,
-                                       "prop_subt": prop_subt,
-                                       "prop_extr": prop_extr,
-                                       "gap": gap
-                                   } for cert, prop_subt, prop_extr, gap in don_graphs)
-                             )
-            rec_sess.commit()
+            total = len(don_graphs)
+            print(f"found {len(don_graphs)}")
+            to_update = tuple({
+                                  "cert": cert,
+                                  "prop_subt": prop_subt,
+                                  "prop_extr": prop_extr,
+                                  "gap": gap
+                              } for cert, prop_subt, prop_extr, gap in don_graphs)
+            progbar = manager.counter(total=total, desc=f"Updating...", leave=False)
+            for i in range(0, total, STEP):
+                chunk = to_update[i:i + STEP]
+                rec_sess.execute(update(g_mod).where(g_mod.certificate == bindparam("cert")),
+                                 chunk
+                                 )
+                rec_sess.commit()
+                progbar.update(incr=STEP)
+    progbar.close()
     print(f"Updated!")
+    manager.stop()
 
 
 if __name__ == '__main__':
