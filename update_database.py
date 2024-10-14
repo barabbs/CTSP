@@ -65,8 +65,8 @@ def update_database(n, k=2, weights=None, donor=None, recip=None):
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
     g_mod = models[GRAPH]
-    don_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, donor)}", echo=True)
-    rec_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, recip)}", echo=True)
+    don_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, donor)}")
+    rec_eng = create_engine(f"sqlite:///{os.path.join(var.DATABASE_DIR, recip)}")
     with (Session(don_eng) as don_sess):
         with Session(rec_eng) as rec_sess:
             don_graphs = don_sess.execute(select(
@@ -96,4 +96,4 @@ def update_database(n, k=2, weights=None, donor=None, recip=None):
 
 
 if __name__ == '__main__':
-    update_database_old(n=11, donor="k2_n11_w1-1_h00001.cgdb", recip="k2_n11_w1-1_m00001.cgdb")
+    update_database(n=11, donor="k2_n11_w1-1_h00001.cgdb", recip="k2_n11_w1-1_m00001.cgdb")
