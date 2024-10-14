@@ -110,7 +110,8 @@ def _get_coding_text(coding):
                              "\\,\\big]$" for cover in coding.covers) + "}"
 
 
-def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', colors=None, begin=None, end=None, insertfile=None, **new_options):
+def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', colors=None, begin=None, end=None,
+                 insertfile=None, pass_by=None, **new_options):
     coding = coding or graph.coding
     nx_graph = graph.weighted_digraph
     options = DEFAULT_LATEX_OPTIONS.copy()
@@ -123,8 +124,12 @@ def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', color
             pos = nx.rescale_layout_dict(nx.planar_layout(nx_graph), scale=3)
         except nx.NetworkXException:
             pos = nx.shell_layout(nx_graph)
-        print(dict((k,tuple(round(i,2) for i in v)) for k,v in pos.items()))
+        print(dict((k, tuple(round(i, 2) for i in v)) for k, v in pos.items()))
     latex = nx.drawing.to_latex_raw(nx_graph, pos=pos, **options)
+    for (u, v), points in (pass_by or dict()).items():
+        if not type(points[0]) == tuple:
+            points = (points,)
+        latex = latex.replace(f"({u}) to ({v})", f"({u}) to {' to '.join(str(p) for p in points)} to ({v})")
     lines = latex.split("\n")
     if coding_pos is not None:
         coding_text = f"      \\node[{LATEX_CODING_STYLE}] at {coding_pos} {_get_coding_text(coding)};\n"
@@ -132,9 +137,9 @@ def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', color
         coding_text = ""
     if insertfile is not None:
         with open(os.path.join(var.LATEX_GRAPH_DIR, insertfile), "r") as f:
-            insert=f.read()
+            insert = f.read()
     else:
-        insert=""
+        insert = ""
     latex = f"""{begin or lines[0]}\n{coding_text}{f"      \\draw[{LATEX_NODES_STYLE}]"}\n{'\n'.join(lines[2:-2])}\n{insert}{end or '\n'.join(lines[-2:])}"""
 
     with open(os.path.join(var.LATEX_GRAPH_DIR, filename), "w") as f:
