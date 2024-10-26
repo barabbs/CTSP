@@ -13,6 +13,28 @@ def partition(n, maximum=float("inf"), minimum=2):
         start=tuple())
 
 
+def partitions_generator(n, k=2):
+    if not k == 2:
+        raise NotImplemented
+    partitions = tuple(partition(n, minimum=2))
+    for i_p, p_1 in enumerate(partitions):
+        for p_2 in partitions[i_p:]:
+            if p_2 == (n,):
+                continue
+            yield p_1, p_2
+    partition.cache_clear()
+
+
+def manual_partitions_generator(n, k=2):
+    if not k == 2:
+        raise NotImplemented
+    with open(var.GENERATOR_SETTINGS_FILEPATH.format(n=n, k=k), 'r') as f:
+        data = json.load(f)
+    parts = data['parts']
+    for p_1, p_2 in parts:
+        yield tuple(p_1), tuple(p_2)
+
+
 @cache
 def cycles(nodes, parts, minimum=None):
     if len(parts) == 0:
@@ -30,22 +52,6 @@ def cycles(nodes, parts, minimum=None):
              cycles(reminder, parts[1:], minimum=(parts[0], top))),
             start=tuple())
     return result
-
-
-def full_codings_generator(n, k=2):
-    if not k == 2:
-        raise NotImplemented
-    nodes = tuple(range(n))
-    partitions = tuple(partition(n, minimum=2))
-    for i_p, p_1 in enumerate(partitions):
-        c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
-        for p_2 in partitions[i_p:]:
-            if p_2 == (n,):
-                continue
-            for c_2 in cycles(frozenset(nodes), p_2):
-                yield (c_1, c_2), (p_1, p_2)
-    partition.cache_clear()
-    cycles.cache_clear()
 
 
 @cache
@@ -80,59 +86,99 @@ def cycles_no_integer(nodes, parts, succ, minimum=None):
     return result
 
 
-def half_codings_generator(n, k=2):
+def codings_generator(n, parts, gen_type, k=2):
     if not k == 2:
         raise NotImplemented
     nodes = tuple(range(n))
-    partitions = tuple(partition(n, minimum=2))
-    for i_p, p_1 in enumerate(partitions):
-        c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
-        succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
-        # print(f"{c_1} - {succ}")
-        for p_2 in partitions[i_p:]:
-            if p_2 == (n,):
-                continue
-            # print(f"\t{p_2}")
-            for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
-                # print(f"\t\t{c_2}")
-                yield (c_1, c_2), (p_1, p_2)
-    partition.cache_clear()
-    cycles_no_integer.cache_clear()
-    get_non_integer.cache_clear()
-
-
-def manual_codings_generator(n, k=2):
-    if not k == 2:
-        raise NotImplemented
-    nodes = tuple(range(n))
-    with open(var.GENERATOR_SETTINGS_FILEPATH.format(n=n, k=k), 'r') as f:
-        data = json.load(f)
-    parts = data['parts']
-    for p_1, p_2 in parts:
-        p_1, p_2 = tuple(p_1), tuple(p_2)
-        c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
+    p_1, p_2 = parts
+    c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
+    if gen_type == "full":
+        for c_2 in cycles(frozenset(nodes), p_2):
+            yield c_1, c_2
+        partition.cache_clear()
+        cycles.cache_clear()
+    elif gen_type == "half":
         succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
         for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
-            yield (c_1, c_2), (p_1, p_2)
-    cycles_no_integer.cache_clear()
-    get_non_integer.cache_clear()
+            yield c_1, c_2
+        cycles_no_integer.cache_clear()
+        get_non_integer.cache_clear()
+    else:
+        raise NotImplemented
+
+
+# def full_codings_generator_old(n, k=2):
+#     if not k == 2:
+#         raise NotImplemented
+#     nodes = tuple(range(n))
+#     partitions = tuple(partition(n, minimum=2))
+#     for i_p, p_1 in enumerate(partitions):
+#         c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
+#         for p_2 in partitions[i_p:]:
+#             if p_2 == (n,):
+#                 continue
+#             for c_2 in cycles(frozenset(nodes), p_2):
+#                 yield (c_1, c_2), (p_1, p_2)
+#     partition.cache_clear()
+#     cycles.cache_clear()
+#
+#
+# def half_codings_generator_old(n, k=2):
+#     if not k == 2:
+#         raise NotImplemented
+#     nodes = tuple(range(n))
+#     partitions = tuple(partition(n, minimum=2))
+#     for i_p, p_1 in enumerate(partitions):
+#         c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
+#         succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
+#         # print(f"{c_1} - {succ}")
+#         for p_2 in partitions[i_p:]:
+#             if p_2 == (n,):
+#                 continue
+#             # print(f"\t{p_2}")
+#             for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
+#                 # print(f"\t\t{c_2}")
+#                 yield (c_1, c_2), (p_1, p_2)
+#     partition.cache_clear()
+#     cycles_no_integer.cache_clear()
+#     get_non_integer.cache_clear()
+#
+#
+# def manual_codings_generator_old(n, k=2):
+#     if not k == 2:
+#         raise NotImplemented
+#     nodes = tuple(range(n))
+#     with open(var.GENERATOR_SETTINGS_FILEPATH.format(n=n, k=k), 'r') as f:
+#         data = json.load(f)
+#     parts = data['parts']
+#     for p_1, p_2 in parts:
+#         p_1, p_2 = tuple(p_1), tuple(p_2)
+#         c_1 = tuple(nodes[sum(p_1[:i]):sum(p_1[:i + 1])] for i, p in enumerate(p_1))
+#         succ = tuple(nodes[sum(p_1[:i]) + (j + 1) % p] for i, p in enumerate(p_1) for j in range(p))
+#         for c_2 in cycles_no_integer(frozenset(nodes), p_2, succ=succ):
+#             yield (c_1, c_2), (p_1, p_2)
+#     cycles_no_integer.cache_clear()
+#     get_non_integer.cache_clear()
 
 
 CODINGS_GENERATORS = {
     'f': {
         'name': "full",
         'descr': "generates all possible graph codings",
-        'func': full_codings_generator
+        # 'func': full_codings_generator
+        'func': (partitions_generator, "full")
     },
     'h': {
         'name': "half",
         'descr': "generates all graph codings with non-integer edges ",
-        'func': half_codings_generator
+        # 'func': half_codings_generator
+        'func': (partitions_generator, "half")
     },
     'm': {
-        'name': "manual",
+        'name': "manual half",
         'descr': "generates graph codings as described in the relative generator settings",
-        'func': manual_codings_generator
+        # 'func': manual_codings_generator
+        'func': (manual_partitions_generator, "half")
     },
 }
 

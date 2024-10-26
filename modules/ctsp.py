@@ -1,6 +1,6 @@
 from modules.models import get_models, GRAPH, TIMINGS, GAP_INFO
 from modules.calculations import Calculators, CANON, CERTIFICATE, SUBT_EXTR, GAP
-from modules.combinatorics import CODINGS_GENERATORS
+from modules.combinatorics import CODINGS_GENERATORS, codings_generator
 from modules.parallelization import parallel_run
 from modules import var
 from modules import utility as utl
@@ -14,6 +14,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 import enlighten
 import multiprocessing
+import queue
 
 STRATEGIES = {
     "P": {
@@ -124,17 +125,43 @@ STRATEGIES = {
 }
 
 
-class GeneratorHelper(multiprocessing.Process):
-    def __init__(self, generator_func, n, k, weights, reduced=False):
-        super().__init__(name=f"generation_helper", daemon=True)
+class GeneratorProcess(multiprocessing.Process):
+    def __init__(self, number, gen_type, n, k, weights, reduced, input_queue, max_size, cert_calculator=None):
+        super().__init__(name=f"gen_process_{number:03}", daemon=True)
         self.n, self.k, self.weights = n, k, weights
-        self.generator_func = generator_func
+        self.gen_type = gen_type
         self.reduced = reduced
-        self.cert_calculator = None
-        self.output_queue = multiprocessing.Queue()
+        self.cert_calculator = cert_calculator
+        self.input_queue, self.output_queue = input_queue, multiprocessing.Queue(maxsize=max_size)
 
-    def set_cert_calculator(self, calculator):
+    def run(self):
+        os.nice(var.PROCESSES_NICENESS)
+        while True:
+            try:
+                parts = self.input_queue.get(block=False)
+            except queue.Empty:
+                break
+            if not self.reduced:
+                for c in codings_generator(self.n, parts, self.gen_type, self.k):
+                    self.output_queue.put({"coding": c, "parts": parts})
+            else:
+                self.cert_calculator.initialize()
+                for c in codings_generator(self.n, parts, self.gen_type, self.k):
+                    cert = self.cert_calculator.calc(Graph(n=self.n, k=self.k, weights=self.weights,
+                                                           coding=c))[var.GRAPH_TABLE]['certificate']
+                    self.output_queue.put({"coding": c, "parts": parts, "certificate": cert})
+                self.cert_calculator.close()
+
+
+class Generator(object):
+    def __init__(self, generator, n, k, weights, max_workers, reduced, calculator=None, chunk=10000):
+        self.n, self.k, self.weights = n, k, weights
+        self.generator = generator
+        self.reduced = reduced
+        self.max_workers = max_workers
         self.cert_calculator = calculator
+        self.chunk = chunk // self.max_workers
+        self.input_queue, self.output_queue = multiprocessing.Queue(maxsize=2 * chunk), multiprocessing.Queue()
 
     def _update_database(self, session, models, cache):
         session.execute(insert(models[GRAPH]), cache)
@@ -148,44 +175,38 @@ class GeneratorHelper(multiprocessing.Process):
     UPDATE_FUNCTIONS = {False: _update_database,
                         True: _reduced_update_database}
 
-    def generate(self, engine, models, chunk=1000):
-        self.start()
-        finish = False
+    def generate(self, engine, models):
+        partition_func, gen_type = CODINGS_GENERATORS[self.generator]['func']
+        for p in partition_func(self.n, self.k):
+            self.input_queue.put(p)
+        processes = tuple(GeneratorProcess(i, gen_type, self.n, self.k, self.weights, self.reduced, self.input_queue,
+                                           max_size=10 * self.chunk,
+                                           cert_calculator=self.cert_calculator) for i in range(self.max_workers))
+        for proc in processes:
+            proc.start()
         manager = enlighten.get_manager()
         progbar = manager.counter(total=None, desc='Generating', leave=False)
-        update_database_func = GeneratorHelper.UPDATE_FUNCTIONS[self.reduced]
+        update_database_func = Generator.UPDATE_FUNCTIONS[self.reduced]
         with Session(engine) as session:
-            while not finish:
-                i, cache = 0, list()
-                while not self.output_queue.empty() and i < chunk:
-                    entry = self.output_queue.get(block=False)
-                    if entry is None:
-                        finish = True
-                        break
-                    cache.append(entry)
-                    i += 1
-                if i > 0:
+            while True:
+                cache = list()
+                for proc in processes:
+                    for _ in range(self.chunk):
+                        try:
+                            cache.append(proc.output_queue.get(block=False))
+                        except queue.Empty:
+                            pass
+                if len(cache) > 0:
                     update_database_func(self, session, models, cache)
-                    progbar.update(incr=i)
+                    progbar.update(incr=len(cache))
+                if not any(proc.is_alive() for proc in processes):
+                    break
             session.execute(insert(models[TIMINGS]).from_select(["coding", ], select(models[GRAPH].coding)))
             session.commit()
         logging.trace(
             f"    Saved {session.query(models[GRAPH]).count()} entries out of {progbar.count} generated")
         progbar.close()
         manager.stop()
-
-    def run(self):
-        if not self.reduced:
-            for c, p in self.generator_func(self.n, self.k):
-                self.output_queue.put({"coding": c, "parts": p})
-        else:
-            self.cert_calculator.initialize()
-            for c, p in self.generator_func(self.n, self.k):
-                cert = self.cert_calculator.calc(Graph(n=self.n, k=self.k, weights=self.weights,
-                                                       coding=c))[var.GRAPH_TABLE]['certificate']
-                self.output_queue.put({"coding": c, "parts": p, "certificate": cert})
-            self.cert_calculator.close()
-        self.output_queue.put(None)
 
 
 def initialize_database(metadata, models, n, k, weights, strategy, generator, calculators,
@@ -201,11 +222,11 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
         logging.trace(f"    Generating database {os.path.basename(path)}")
         try:
             metadata.create_all(engine)
-            generator_func = CODINGS_GENERATORS[generator]['func']
-            helper = GeneratorHelper(generator_func, n, k, weights, reduced=reduced)
-            if reduced:
-                helper.set_cert_calculator(
-                    calculators.get_calculation(CERTIFICATE, n=n, k=k, weights=weights, **options))
+            calculator = calculators.get_calculation(CERTIFICATE, n=n, k=k, weights=weights,
+                                                     **options) if reduced else None
+            helper = Generator(generator, n, k, weights, max_workers=options["workers"],
+                               reduced=reduced, calculator=calculator)
+
             helper.generate(engine, models)
         except (Exception, KeyboardInterrupt) as e:
             logging.warning(f"Interupted - Deleting database {os.path.basename(path)}")
@@ -229,7 +250,8 @@ def run(n, k, weights, strategy, generator, calcs_indices, reduced, **options):
     options_descr = '\n    '.join(f"{i + ':':<23} {v}" for i, v in options.items())
     calcs_descr = '\n    '.join(
         f'{calc_type.upper():<12}{calc.CALC_NAME}' for calc_type, calc in calculators.calcs_classes.items())
-    strategy_descr = STRATEGIES[strategy].get('descr' if not reduced else 'reduced_descr') or STRATEGIES[strategy]['descr']
+    strategy_descr = STRATEGIES[strategy].get('descr' if not reduced else 'reduced_descr') or STRATEGIES[strategy][
+        'descr']
     logging.info(f"""
     
 {'-' * 128}
