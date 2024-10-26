@@ -12,7 +12,7 @@ TIMINGS = var.TIMINGS_TABLE
 GAP_INFO = var.GAP_INFO_TABLE
 
 
-def get_models(N, K, W):
+def get_models(N, K, W, reduced=False):
     class Base(DeclarativeBase):
         pass
 
@@ -24,7 +24,7 @@ def get_models(N, K, W):
         weights = W
         coding = mapped_column(PickleType, nullable=False, primary_key=True)
         parts = mapped_column(PickleType, nullable=False)
-        certificate = mapped_column(LargeBinary, nullable=True)
+        certificate = mapped_column(LargeBinary, nullable=True, unique=reduced)
         gap = mapped_column(Float, nullable=True)
         prop_subt = mapped_column(Boolean, nullable=True)
         prop_extr = mapped_column(Boolean, nullable=True)

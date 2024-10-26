@@ -113,7 +113,8 @@ def prettyprint_graph_adj(n, adj, labels=None, line_start="\t"):
 def save_run_info_file(infos, start_time, time_name, delete=False):
     filepath = var.RUN_INFO_FILEPATH.format(
         k=infos['k'], n=infos['n'], weights="-".join(str(i) for i in infos['weights']),
-        strategy=infos['strategy'], generator=infos['generator'], calculators=infos['calculators'])
+        strategy=infos['strategy'], generator=infos['generator'], calculators=infos['calculators'],
+        reduced='R' if infos['reduced'] else '')
     try:
         if delete:
             os.remove(filepath)

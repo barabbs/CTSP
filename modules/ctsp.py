@@ -4,13 +4,16 @@ from modules.combinatorics import CODINGS_GENERATORS
 from modules.parallelization import parallel_run
 from modules import var
 from modules import utility as utl
+from modules.graph import Graph
 
 import os, logging
 import time
 
-from sqlalchemy import create_engine, select, insert, update, bindparam, func
+from sqlalchemy import create_engine, select, update, bindparam, func
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 import enlighten
+import multiprocessing
 
 STRATEGIES = {
     "P": {
@@ -68,6 +71,13 @@ STRATEGIES = {
                              'prop_extr': True,
                              'gap': None},
                    'group_by': 'certificate'}),
+        ),
+        'reduced_descr': "SUB_EXT > GAP",
+        'reduced_sequence': (
+            (SUBT_EXTR, {'where': {'prop_subt': None}}),
+            (GAP, {'where': {'prop_subt': True,
+                             'prop_extr': True,
+                             'gap': None}}),
         )
     },
     "2": {
@@ -105,14 +115,84 @@ STRATEGIES = {
                    'group_by': 'certificate'}),
         )
     },
+    "-": {
+        'name': "empty",
+        'descr': "",
+        'sequence': ()
+    },
 
 }
 
 
+class GeneratorHelper(multiprocessing.Process):
+    def __init__(self, generator_func, n, k, weights, reduced=False):
+        super().__init__(name=f"generation_helper", daemon=True)
+        self.n, self.k, self.weights = n, k, weights
+        self.generator_func = generator_func
+        self.reduced = reduced
+        self.cert_calculator = None
+        self.output_queue = multiprocessing.Queue()
+
+    def set_cert_calculator(self, calculator):
+        self.cert_calculator = calculator
+
+    def _update_database(self, session, models, cache):
+        session.execute(insert(models[GRAPH]), cache)
+        # session.execute(insert(models[TIMINGS]), tuple({"coding": entry["coding"]} for entry in cache))
+        session.commit()
+
+    def _reduced_update_database(self, session, models, cache):
+        session.execute(insert(models[GRAPH]).on_conflict_do_nothing(index_elements=['certificate']), cache)
+        session.commit()
+
+    UPDATE_FUNCTIONS = {False: _update_database,
+                        True: _reduced_update_database}
+
+    def generate(self, engine, models, chunk=1000):
+        self.start()
+        finish = False
+        manager = enlighten.get_manager()
+        progbar = manager.counter(total=None, desc='Generating', leave=False)
+        update_database_func = GeneratorHelper.UPDATE_FUNCTIONS[self.reduced]
+        with Session(engine) as session:
+            while not finish:
+                i, cache = 0, list()
+                while not self.output_queue.empty() and i < chunk:
+                    entry = self.output_queue.get(block=False)
+                    if entry is None:
+                        finish = True
+                        break
+                    cache.append(entry)
+                    i += 1
+                if i > 0:
+                    update_database_func(self, session, models, cache)
+                    progbar.update(incr=i)
+            session.execute(insert(models[TIMINGS]).from_select(["coding", ], select(models[GRAPH].coding)))
+            session.commit()
+        logging.trace(
+            f"    Saved {session.query(models[GRAPH]).count()} entries out of {progbar.count} generated")
+        progbar.close()
+        manager.stop()
+
+    def run(self):
+        if not self.reduced:
+            for c, p in self.generator_func(self.n, self.k):
+                self.output_queue.put({"coding": c, "parts": p})
+        else:
+            self.cert_calculator.initialize()
+            for c, p in self.generator_func(self.n, self.k):
+                cert = self.cert_calculator.calc(Graph(n=self.n, k=self.k, weights=self.weights,
+                                                       coding=c))[var.GRAPH_TABLE]['certificate']
+                self.output_queue.put({"coding": c, "parts": p, "certificate": cert})
+            self.cert_calculator.close()
+        self.output_queue.put(None)
+
+
 def initialize_database(metadata, models, n, k, weights, strategy, generator, calculators,
-                        delete=False, sql_verbose=False, **options):
+                        delete=False, sql_verbose=False, reduced=False, **options):
     path = var.DATABASE_FILEPATH.format(k=k, n=n, weights="-".join(str(i) for i in weights),
-                                        strategy=strategy, generator=generator, calculators=calculators)
+                                        strategy=strategy, generator=generator, calculators=calculators,
+                                        reduced='R' if reduced else '')
     if delete and os.path.exists(path):
         os.remove(path)
         logging.trace(f"    Deleted database {os.path.basename(path)}")
@@ -122,11 +202,11 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
         try:
             metadata.create_all(engine)
             generator_func = CODINGS_GENERATORS[generator]['func']
-            codings = tuple(generator_func(n, k))
-            with Session(engine) as session:
-                session.execute(insert(models[GRAPH]), tuple(dict(coding=c, parts=p) for c, p in codings))
-                session.execute(insert(models[TIMINGS]), tuple(dict(coding=c) for c, p in codings))
-                session.commit()
+            helper = GeneratorHelper(generator_func, n, k, weights, reduced=reduced)
+            if reduced:
+                helper.set_cert_calculator(
+                    calculators.get_calculation(CERTIFICATE, n=n, k=k, weights=weights, **options))
+            helper.generate(engine, models)
         except (Exception, KeyboardInterrupt) as e:
             logging.warning(f"Interupted - Deleting database {os.path.basename(path)}")
             os.remove(path)
@@ -135,7 +215,7 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
     return engine
 
 
-def run(n, k, weights, strategy, generator, calcs_indices, **options):
+def run(n, k, weights, strategy, generator, calcs_indices, reduced, **options):
     weights = weights or (1,) * k
     calculators = Calculators(calcs_indices)
     options.update({"est_calc_time_params": var.EST_CALC_TIME_PARAMS})
@@ -144,17 +224,19 @@ def run(n, k, weights, strategy, generator, calcs_indices, **options):
              "strategy": strategy,
              "generator": generator,
              "calculators": str(calculators),
+             "reduced": reduced,
              "options": options}
     options_descr = '\n    '.join(f"{i + ':':<23} {v}" for i, v in options.items())
     calcs_descr = '\n    '.join(
         f'{calc_type.upper():<12}{calc.CALC_NAME}' for calc_type, calc in calculators.calcs_classes.items())
+    strategy_descr = STRATEGIES[strategy].get('descr' if not reduced else 'reduced_descr') or STRATEGIES[strategy]['descr']
     logging.info(f"""
     
 {'-' * 128}
 PARAMS         n={n}, k={k}, w={weights}
 
-STRATEGY       {strategy} - {STRATEGIES[strategy]['name']:<12}  [{STRATEGIES[strategy]['descr']}]
-GENERATION     {generator} - {CODINGS_GENERATORS[generator]['name']:<12}  [{CODINGS_GENERATORS[generator]['descr']}]
+STRATEGY       {strategy} - {STRATEGIES[strategy]['name']:<12}  [{strategy_descr}]    {'REDUCED' if reduced and 'reduced_descr' in STRATEGIES[strategy] else ''}
+GENERATION     {generator} - {CODINGS_GENERATORS[generator]['name']:<12}  [{CODINGS_GENERATORS[generator]['descr']}]    {'REDUCED' if reduced else ''}
 CALCULATORS    {calculators}
     {calcs_descr}
 
@@ -164,14 +246,18 @@ OPTIONS
 
 """)
     start_time = time.time()
-    metadata, models = get_models(n, k, weights)
+    metadata, models = get_models(n, k, weights, reduced=reduced)
     logging.info("DATABASE")
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights,
                                  strategy=strategy, generator=generator, calculators=calculators,
-                                 **options)
+                                 reduced=reduced, **options)
     utl.save_run_info_file(infos, start_time=start_time, time_name="database", delete=options['delete'])
-    for calc_type, statements in STRATEGIES[strategy]['sequence']:
+    sequence = STRATEGIES[strategy].get('sequence' if not reduced else 'reduced_sequence')
+    if sequence is None:
+        logging.warning("NO REDUCED SEQUENCE FOUND FOR STRATEGY - reverting to default sequence")
+        sequence = STRATEGIES[strategy]['sequence']
+    for calc_type, statements in sequence:
         logging.info(
             f"{calc_type.upper():<10} (where: {', '.join(f'{a}={v}' for a, v in statements['where'].items())} / group_by: {statements.get('group_by', '--- ')})")
         start_time = time.time()
@@ -193,4 +279,3 @@ OPTIONS
             utl.set_best_gap(n=n, gap=max_gap)
         else:
             logging.warning(f"No gap found!")
-

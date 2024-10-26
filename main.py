@@ -36,7 +36,8 @@ def init_logging(level):
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)  # Capture all messages
     # Create file handler
-    file_handler = logging.FileHandler(os.path.join(var.LOGS_DIR, f"{datetime.now().strftime(var.DATETIME_FORMAT)}.log"))
+    file_handler = logging.FileHandler(
+        os.path.join(var.LOGS_DIR, f"{datetime.now().strftime(var.DATETIME_FORMAT)}.log"))
     file_handler.setLevel(logging.RLOG)  # Log everything to file
     file_formatter = logging.Formatter(LOG_FORMAT)
     file_handler.setFormatter(file_formatter)
@@ -143,6 +144,8 @@ parser.add_argument("--max_commit_cache", type=int, default=var.MAX_COMMIT_CACHE
                     help=f"maximum commit cache size before committing to database  (default: {var.MAX_COMMIT_CACHE})\n\n")
 parser.add_argument("--sql_verbose", action="store_true",
                     help="verbosity of SqlAlchemy backend\n\n")
+parser.add_argument("--reduced", action="store_true",
+                    help="keeps in database only non-isomorphic codings\n\n")
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -182,7 +185,7 @@ if __name__ == '__main__':
                "debug_memory": args.debug_memory,
                "commit_interval": args.commit_interval,
                "max_commit_cache": args.max_commit_cache,
-               "sql_verbose": args.sql_verbose, }
+               "sql_verbose": args.sql_verbose}
 
     calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
 
@@ -193,7 +196,7 @@ if __name__ == '__main__':
             ctsp.run(
                 k=k, n=n, weights=args.weights,
                 strategy=args.strategy.upper(), generator=args.generator.lower(), calcs_indices=calcs_indices,
-                **options
+                reduced=args.reduced, **options
             )
 
 """
