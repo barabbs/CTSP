@@ -110,10 +110,10 @@ def _get_coding_text(coding):
                              "\\,\\big]$" for cover in coding.covers) + "}"
 
 
-def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', colors=None, begin=None, end=None,
-                 insertfile=None, pass_by=None, **new_options):
-    coding = coding or graph.coding
-    nx_graph = graph.weighted_digraph
+def create_latex(graph=None, filename=None, coding=None, coding_pos=None, pos='pos', colors=None, begin=None, end=None,
+                 insertfile=None, insert=None, pass_by=None, nx_graph=None, **new_options):
+    coding = coding or getattr(graph, "coding", None)
+    nx_graph = nx_graph or graph.weighted_digraph
     options = DEFAULT_LATEX_OPTIONS.copy()
     options["edge_options"] = _get_latex_edges_styles(graph, colors)
     for edge, opt in new_options.pop("edge_options", dict()).items():
@@ -139,7 +139,7 @@ def create_latex(graph, filename, coding=None, coding_pos=None, pos='pos', color
         with open(os.path.join(var.LATEX_GRAPH_DIR, insertfile), "r") as f:
             insert = f.read()
     else:
-        insert = ""
+        insert = insert or ""
     latex = f"""{begin or lines[0]}\n{coding_text}{f"      \\draw[{LATEX_NODES_STYLE}]"}\n{'\n'.join(lines[2:-2])}\n{insert}{end or '\n'.join(lines[-2:])}"""
 
     with open(os.path.join(var.LATEX_GRAPH_DIR, filename), "w") as f:
