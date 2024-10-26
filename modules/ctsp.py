@@ -126,13 +126,14 @@ STRATEGIES = {
 
 
 class GeneratorProcess(multiprocessing.Process):
-    def __init__(self, number, gen_type, n, k, weights, reduced, input_queue, max_size, cert_calculator=None):
+    def __init__(self, number, gen_type, n, k, weights, reduced, input_queue, chunksize, maxsize, cert_calculator=None):
         super().__init__(name=f"gen_process_{number:03}", daemon=True)
         self.n, self.k, self.weights = n, k, weights
         self.gen_type = gen_type
         self.reduced = reduced
         self.cert_calculator = cert_calculator
-        self.input_queue, self.output_queue = input_queue, multiprocessing.Queue(maxsize=max_size)
+        self.input_queue, self.output_queue = input_queue, multiprocessing.Queue(maxsize=maxsize)
+        self.chunksize = chunksize
 
     def run(self):
         os.nice(var.PROCESSES_NICENESS)
@@ -141,27 +142,36 @@ class GeneratorProcess(multiprocessing.Process):
                 parts = self.input_queue.get(block=False)
             except queue.Empty:
                 break
+            cache = list()
             if not self.reduced:
-                for c in codings_generator(self.n, parts, self.gen_type, self.k):
-                    self.output_queue.put({"coding": c, "parts": parts})
+                for i, c in enumerate(codings_generator(self.n, parts, self.gen_type, self.k)):
+                    cache.append({"coding": c, "parts": parts})
+                    if i + 1 % self.chunksize == 0:
+                        self.output_queue.put(cache)
+                        cache = list()
+                self.output_queue.put(cache)
             else:
                 self.cert_calculator.initialize()
-                for c in codings_generator(self.n, parts, self.gen_type, self.k):
+                for i, c in enumerate(codings_generator(self.n, parts, self.gen_type, self.k)):
                     cert = self.cert_calculator.calc(Graph(n=self.n, k=self.k, weights=self.weights,
                                                            coding=c))[var.GRAPH_TABLE]['certificate']
-                    self.output_queue.put({"coding": c, "parts": parts, "certificate": cert})
+                    cache.append({"coding": c, "parts": parts, "certificate": cert})
+                    if i + 1 % self.chunksize == 0:
+                        self.output_queue.put(cache)
+                        cache = list()
                 self.cert_calculator.close()
+                self.output_queue.put(cache)
 
 
 class Generator(object):
-    def __init__(self, generator, n, k, weights, max_workers, reduced, calculator=None, chunk=10000):
+    def __init__(self, generator, n, k, weights, max_workers, reduced, calculator=None, chunksize=1000, max_cache=10000):
         self.n, self.k, self.weights = n, k, weights
         self.generator = generator
         self.reduced = reduced
         self.max_workers = max_workers
         self.cert_calculator = calculator
-        self.chunk = chunk // self.max_workers
-        self.input_queue, self.output_queue = multiprocessing.Queue(maxsize=2 * chunk), multiprocessing.Queue()
+        self.chunksize, self.max_cache = chunksize, max_cache
+        self.input_queue = multiprocessing.Queue()
 
     def _update_database(self, session, models, cache):
         session.execute(insert(models[GRAPH]), cache)
@@ -180,7 +190,7 @@ class Generator(object):
         for p in partition_func(self.n, self.k):
             self.input_queue.put(p)
         processes = tuple(GeneratorProcess(i, gen_type, self.n, self.k, self.weights, self.reduced, self.input_queue,
-                                           max_size=10 * self.chunk,
+                                           chunksize=self.chunksize, maxsize=10,
                                            cert_calculator=self.cert_calculator) for i in range(self.max_workers))
         for proc in processes:
             proc.start()
@@ -188,18 +198,20 @@ class Generator(object):
         progbar = manager.counter(total=None, desc='Generating', leave=False)
         update_database_func = Generator.UPDATE_FUNCTIONS[self.reduced]
         with Session(engine) as session:
+            cache = list()
             while True:
-                cache = list()
                 for proc in processes:
-                    for _ in range(self.chunk):
-                        try:
-                            cache.append(proc.output_queue.get(block=False))
-                        except queue.Empty:
-                            pass
-                if len(cache) > 0:
-                    update_database_func(self, session, models, cache)
-                    progbar.update(incr=len(cache))
-                if not any(proc.is_alive() for proc in processes):
+                    if proc.output_queue.empty():
+                        continue
+                    cache += proc.output_queue.get(block=False)
+                    if len(cache) >= self.max_cache:
+                        update_database_func(self, session, models, cache)
+                        progbar.update(incr=len(cache))
+                        cache = list()
+                if all(proc.output_queue.empty() and not proc.is_alive() for proc in processes):
+                    if len(cache) > 0:
+                        update_database_func(self, session, models, cache)
+                        progbar.update(incr=len(cache))
                     break
             session.execute(insert(models[TIMINGS]).from_select(["coding", ], select(models[GRAPH].coding)))
             session.commit()
@@ -225,7 +237,8 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
             calculator = calculators.get_calculation(CERTIFICATE, n=n, k=k, weights=weights,
                                                      **options) if reduced else None
             helper = Generator(generator, n, k, weights, max_workers=options["workers"],
-                               reduced=reduced, calculator=calculator)
+                               reduced=reduced, calculator=calculator,
+                               chunksize=options["max_chunksize"], max_cache=options["max_commit_cache"])
 
             helper.generate(engine, models)
         except (Exception, KeyboardInterrupt) as e:
