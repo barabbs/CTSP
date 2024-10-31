@@ -7,7 +7,7 @@ import networkx as nx
 
 
 class Graph(object):
-    LAZY_ATTRS = {'graph', 'vector', 'digraph', 'weighted_digraph', 'nauty_graph', 'adjacency_matrix'}
+    LAZY_ATTRS = {'graph', 'vector', 'digraph', 'weighted_digraph', 'nauty_graph', 'adjacency_matrix', 'numpy_array'}
 
     def __init__(self, n, k, weights, coding, **kwargs):
         self.n, self.k, self.weights = n, k, weights
