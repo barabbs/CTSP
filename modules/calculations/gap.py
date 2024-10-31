@@ -234,6 +234,8 @@ class GAP_Gurobi_Laziest_Bound(GAP_Gurobi_Laziest, GAP_Gurobi_Bound):
     CALC_NAME = "Gurobi Laziest w/ Bound"
 
 from modules.pygap.pygap import solve_gap
+from contextlib import redirect_stdout
+import sys, os
 
 class GAP_Gurobi_External(Calculation):
     CALC_TYPE = var.CALC_GAP
@@ -244,7 +246,11 @@ class GAP_Gurobi_External(Calculation):
         super().__init__(**kwargs)
 
     def _calc(self, graph):
+        # with open(os.devnull, "w") as f:
+        #     with redirect_stdout(f):
+        # sys.stdout = open(os.devnull, 'w')
         gap = solve_gap(self.n, graph.numpy_array)
+        # sys.stdout = sys.__stdout__
         return {var.GRAPH_TABLE: {'gap': gap}}
 
 

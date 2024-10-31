@@ -69,7 +69,7 @@ class Graph(object):
         return dict(((u, v), w) for u, v, w in self.edge_count_generator(weight=True))
 
     def _get_numpy_array(self):
-        arr = np.zeros(self.n)
+        arr = np.zeros((self.n, self.n))
         for u, v, w in self.edge_count_generator(weight=True):
             arr[u, v] = w
         return arr
