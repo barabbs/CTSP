@@ -68,6 +68,12 @@ class Graph(object):
     def _get_adjacency_matrix(self):
         return dict(((u, v), w) for u, v, w in self.edge_count_generator(weight=True))
 
+    def _get_numpy_array(self):
+        arr = np.zeros(self.n)
+        for u, v, w in self.edge_count_generator(weight=True):
+            arr[u, v] = w
+        return arr
+
     def __getattr__(self, item):
         assert item in Graph.LAZY_ATTRS
         setattr(self, item, getattr(self, f"_get_{item}")())

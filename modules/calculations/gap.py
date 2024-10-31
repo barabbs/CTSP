@@ -213,8 +213,10 @@ class GAP_Gurobi_Lazy(GAP_Gurobi):
         self.load()
         return self.model
 
+
 class GAP_Gurobi_Lazy_Bound(GAP_Gurobi_Lazy, GAP_Gurobi_Bound):
     CALC_NAME = "Gurobi Lazy w/ Bound"
+
 
 class GAP_Gurobi_Laziest(GAP_Gurobi_Lazy):
     CALC_NAME = "Gurobi Laziest"
@@ -227,17 +229,34 @@ class GAP_Gurobi_Laziest(GAP_Gurobi_Lazy):
             self.model.getVarByName(f"c[{u},{v}]").Obj = value
             self.model.getConstrByName(f"dual[{u},{v}]").Sense = '=' if value > 0 else '>'
 
+
 class GAP_Gurobi_Laziest_Bound(GAP_Gurobi_Laziest, GAP_Gurobi_Bound):
     CALC_NAME = "Gurobi Laziest w/ Bound"
+
+from modules.pygap.pygap import solve_gap
+
+class GAP_Gurobi_External(Calculation):
+    CALC_TYPE = var.CALC_GAP
+    CALC_NAME = "Gurobi External"
+
+    def __init__(self, n, **kwargs):
+        self.n = n
+        super().__init__(**kwargs)
+
+    def _calc(self, graph):
+        gap = solve_gap(self.n, graph.numpy_array)
+        return {var.GRAPH_TABLE: {'gap': gap}}
+
 
 CALCULATIONS_LIST = (
     GAP_Gurobi_Lazy,
     GAP_Gurobi_Lazy_Bound,
-    GAP_Gurobi_Laziest,
-    GAP_Gurobi_Laziest_Bound,
+    # GAP_Gurobi_Laziest,
+    # GAP_Gurobi_Laziest_Bound,
     GAP_Gurobi,
     GAP_Gurobi_Bound,
     # GAP_Gurobi_Bound_Constr,
+    GAP_Gurobi_External
 )
 
 """
