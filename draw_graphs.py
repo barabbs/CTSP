@@ -25,6 +25,7 @@ parser.add_argument("-g", "--only-gap", action="store_true",
                     help="only draw graphs with an integrality gap (implicit when -b specified)\n\n")
 parser.add_argument("-r", "--random", action="store_true",
                     help="select entries randomly\n\n")
+parser.add_argument("--reduced", action="store_true")
 parser.add_argument("-s", "--strategy", type=str, default=var.DEFAULT_STRATEGY,
                     help=f"selected strategy for computation, from the following (default: {var.DEFAULT_STRATEGY})" + STRATEGIES_TABLE)
 parser.add_argument("--generator", type=str, default=var.DEFAULT_GENERATOR,
@@ -38,12 +39,12 @@ parser.add_argument("--no-draw", action="store_true",
 
 
 def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_best=None,
-        generator=var.DEFAULT_GENERATOR, calculators=None, no_draw=False, random=False):
+        generator=var.DEFAULT_GENERATOR, calculators=None, reduced=False, no_draw=False, random=False):
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
-                                 n=n, k=k, weights=weights,
+                                 n=n, k=k, weights=weights, reduced=reduced,
                                  strategy=strategy, generator=generator, calculators=calculators)
     with (Session(engine) as session):
         statement = select(models[GRAPH])
@@ -84,4 +85,5 @@ if __name__ == '__main__':
                     continue
             run(n=n, k=k, weights=args.weights,
                 strategy=args.strategy.upper(), generator=args.generator.lower(), calculators=calculators,
+                reduced=args.reduced,
                 only_gap=gap, n_best=args.best, no_draw=args.no_draw, random=args.random)
