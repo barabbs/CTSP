@@ -65,6 +65,8 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
         if compute_gap:
             gap_calc = GAP_Gurobi_External(n)
         for i, graph in enumerate(graphs):
+            if compute_gap:
+                print("\n\n" + "-"*64 + "\n\n")
             print(f"{i:>6}. {str(graph)[9:]:<64}    gap: " + (f"{graph.gap:.5f}" if graph.gap is not None else "---"))
             if compute_gap:
                 gap_calc.calc(graph._graph)
