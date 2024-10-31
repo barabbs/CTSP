@@ -4,6 +4,7 @@ from modules.models import get_models, GRAPH
 from modules.ctsp import initialize_database
 from main import STRATEGIES_TABLE, GENERATORS_TABLE
 from modules.calculations import Calculators, CANON, CERTIFICATE, SUBT_EXTR, GAP, CALCULATIONS
+from modules.calculations.gap import GAP_Gurobi_External
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -23,6 +24,7 @@ parser.add_argument("-b", "--best", type=int, default=None,
                     help="number of graphs with highest gap to draw\n\n")
 parser.add_argument("-g", "--only-gap", action="store_true",
                     help="only draw graphs with an integrality gap (implicit when -b specified)\n\n")
+parser.add_argument("--compute-gap", action="store_true")
 parser.add_argument("-r", "--random", action="store_true",
                     help="select entries randomly\n\n")
 parser.add_argument("--reduced", action="store_true")
@@ -39,7 +41,7 @@ parser.add_argument("--no-draw", action="store_true",
 
 
 def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_best=None,
-        generator=var.DEFAULT_GENERATOR, calculators=None, reduced=False, workers=None, no_draw=False, random=False):
+        generator=var.DEFAULT_GENERATOR, calculators=None, reduced=False, workers=None, no_draw=False, random=False, compute_gap=False):
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
     metadata, models = get_models(n, k, weights)
@@ -60,8 +62,12 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
         tot = n_best or len(graphs)
         print(f"Drawing {tot} graphs (only_gap: {only_gap}, n_best: {n_best}, random: {random}, no_draw: {no_draw})")
         progbar = manager.counter(total=n_best or len(graphs), desc=f"Drawing", leave=False)
+        if compute_gap:
+            gap_calc = GAP_Gurobi_External(n)
         for i, graph in enumerate(graphs):
             print(f"{i:>6}. {str(graph)[9:]:<64}    gap: " + (f"{graph.gap:.5f}" if graph.gap is not None else "---"))
+            if compute_gap:
+                gap_calc.calc(graph._graph)
             if not no_draw:
                 graph.draw()
             progbar.update()
@@ -85,5 +91,5 @@ if __name__ == '__main__':
                     continue
             run(n=n, k=k, weights=args.weights,
                 strategy=args.strategy.upper(), generator=args.generator.lower(), calculators=calculators,
-                reduced=args.reduced,
+                reduced=args.reduced, compute_gap=args.compute_gap,
                 only_gap=gap, n_best=args.best, no_draw=args.no_draw, random=args.random)
