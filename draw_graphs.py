@@ -25,6 +25,7 @@ parser.add_argument("-b", "--best", type=int, default=None,
 parser.add_argument("-g", "--only-gap", action="store_true",
                     help="only draw graphs with an integrality gap (implicit when -b specified)\n\n")
 parser.add_argument("--compute-gap", action="store_true")
+parser.add_argument("--generate-samples", type=str, default=None)
 parser.add_argument("-r", "--random", action="store_true",
                     help="select entries randomly\n\n")
 parser.add_argument("--reduced", action="store_true")
@@ -41,9 +42,13 @@ parser.add_argument("--no-draw", action="store_true",
 
 
 def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_best=None,
-        generator=var.DEFAULT_GENERATOR, calculators=None, reduced=False, workers=None, no_draw=False, random=False, compute_gap=False):
+        generator=var.DEFAULT_GENERATOR, calculators=None, reduced=False, workers=None,
+        no_draw=False, random=False, compute_gap=False, generate_samples=None):
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
+    if generate_samples is not None:
+        dirpath = var.SAMPLES_DIR.format(k=k, n=n)
+        os.makedirs(dirpath, exist_ok=True)
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights, reduced=reduced,
@@ -70,6 +75,12 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
             print(f"{i:>6}. {str(graph)[9:]:<64}    gap: " + (f"{graph.gap:.5f}" if graph.gap is not None else "---"))
             if compute_gap:
                 gap_calc.calc(graph._graph)
+            if generate_samples is not None:
+                with open(os.path.join(dirpath, f"sample_n{n:02}_{i:03}.txt"), 'w') as f:
+                    gr = graph._graph
+                    f.write(f"{gr}\n\nn:   {n}\ngap: {graph.gap}\n\n" +
+                            "\n".join(f"{u},{v},{w}" for u, v, w in gr.edge_count_generator(weight=True)))
+
             if not no_draw:
                 graph.draw()
             progbar.update()
