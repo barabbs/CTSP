@@ -105,5 +105,5 @@ if __name__ == '__main__':
                     continue
             run(n=n, k=k, weights=args.weights,
                 strategy=args.strategy.upper(), generator=args.generator.lower(), calculators=calculators,
-                reduced=args.reduced, compute_gap=args.compute_gap,
+                reduced=args.reduced, compute_gap=args.compute_gap, generate_samples=args.generate_samples,
                 only_gap=gap, n_best=args.best, no_draw=args.no_draw, random=args.random)
