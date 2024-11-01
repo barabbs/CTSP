@@ -49,6 +49,7 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
     if generate_samples is not None:
         dirpath = os.path.join(var.SAMPLES_DIR, generate_samples)
         os.makedirs(dirpath, exist_ok=True)
+        print(f"Generated directory {dirpath}")
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
                                  n=n, k=k, weights=weights, reduced=reduced,
