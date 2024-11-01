@@ -146,6 +146,8 @@ parser.add_argument("--sql_verbose", action="store_true",
                     help="verbosity of SqlAlchemy backend\n\n")
 parser.add_argument("--reduced", action="store_true",
                     help="keeps in database only non-isomorphic codings\n\n")
+parser.add_argument("--force_generation", action="store_true",
+                    help="forces continuation of generation (to be used only with reduced)\n\n")
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -185,7 +187,8 @@ if __name__ == '__main__':
                "debug_memory": args.debug_memory,
                "commit_interval": args.commit_interval,
                "max_commit_cache": args.max_commit_cache,
-               "sql_verbose": args.sql_verbose}
+               "sql_verbose": args.sql_verbose,
+               "force_generation": args.force_generation}
 
     calcs_indices = dict((calc_type, getattr(args, calc_type, 0)) for calc_type in (CANON, CERTIFICATE, SUBT_EXTR, GAP))
 

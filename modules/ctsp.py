@@ -222,7 +222,7 @@ class Generator(object):
 
 
 def initialize_database(metadata, models, n, k, weights, strategy, generator, calculators,
-                        delete=False, sql_verbose=False, reduced=False, **options):
+                        delete=False, sql_verbose=False, reduced=False, force_generation=False, **options):
     path = var.DATABASE_FILEPATH.format(k=k, n=n, weights="-".join(str(i) for i in weights),
                                         strategy=strategy, generator=generator, calculators=calculators,
                                         reduced='R' if reduced else '')
@@ -230,10 +230,11 @@ def initialize_database(metadata, models, n, k, weights, strategy, generator, ca
         os.remove(path)
         logging.trace(f"    Deleted database {os.path.basename(path)}")
     engine = create_engine(f"sqlite:///{path}", echo=sql_verbose)
-    if not os.path.exists(path):
+    if not os.path.exists(path) or force_generation:
         logging.trace(f"    Generating database {os.path.basename(path)}")
         try:
-            metadata.create_all(engine)
+            if not os.path.exists(path):
+                metadata.create_all(engine)
             calculator = calculators.get_calculation(CERTIFICATE, n=n, k=k, weights=weights,
                                                      **options) if reduced else None
             helper = Generator(generator, n, k, weights, max_workers=options["workers"],
