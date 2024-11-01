@@ -16,7 +16,7 @@ def run(n_range, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, generator=var
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
     for n in n_range:
-        dirpath = var.SAMPLES_DIR.format(k=k, n=n)
+        dirpath = os.path.join(var.SAMPLES_DIR, "k{k}_n{n:02d}".format(k=k, n=n))
         os.makedirs(dirpath, exist_ok=True)
         metadata, models = get_models(n, k, weights)
         g_class = models[GRAPH]

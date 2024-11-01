@@ -47,7 +47,7 @@ def run(n, k=2, weights=None, strategy=var.DEFAULT_STRATEGY, only_gap=True, n_be
     manager = enlighten.get_manager()
     weights = weights or (1,) * k
     if generate_samples is not None:
-        dirpath = var.SAMPLES_DIR.format(k=k, n=n)
+        dirpath = os.path.join(var.SAMPLES_DIR, generate_samples)
         os.makedirs(dirpath, exist_ok=True)
     metadata, models = get_models(n, k, weights)
     engine = initialize_database(metadata=metadata, models=models,
