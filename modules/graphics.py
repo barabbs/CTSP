@@ -113,12 +113,13 @@ def _get_coding_text(coding):
 def create_latex(graph=None, filename=None, coding=None, coding_pos=None, pos='pos', colors=None, begin=None, end=None,
                  insertfile=None, insert=None, pass_by=None, nx_graph=None, **new_options):
     coding = coding or getattr(graph, "coding", None)
-    nx_graph = nx_graph or graph.weighted_digraph
     options = DEFAULT_LATEX_OPTIONS.copy()
-    options["edge_options"] = _get_latex_edges_styles(graph, colors)
-    for edge, opt in new_options.pop("edge_options", dict()).items():
-        options["edge_options"][edge] += f", {opt}"
+    if nx_graph is None:
+        options["edge_options"] = _get_latex_edges_styles(graph, colors)
+        for edge, opt in new_options.pop("edge_options", dict()).items():
+            options["edge_options"][edge] += f", {opt}"
     options.update(new_options)
+    nx_graph = nx_graph or graph.weighted_digraph
     if pos is None:
         try:
             pos = nx.rescale_layout_dict(nx.planar_layout(nx_graph), scale=3)
